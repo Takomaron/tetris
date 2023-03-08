@@ -1,35 +1,37 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
+import glob
+from random import random, sample, randint
+import yaml
+import numpy as np
+import shutil
+from collections import deque
+from tensorboardX import SummaryWriter
+import os
 from datetime import datetime
 import pprint
-import random
+# import random
 import copy
 import torch
 import torch.nn as nn
 import sys
 sys.path.append("game_manager/machine_learning/")
-#import omegaconf
-#from hydra import compose, initialize
-import os
-from tensorboardX import SummaryWriter
-from collections import deque
-from random import random, sample,randint
-import shutil
-import glob 
-import numpy as np
-import yaml
-#import subprocess
+# import omegaconf
+# from hydra import compose, initialize
+# import subprocess
 
 ###################################################
 ###################################################
-# ãƒ–ãƒ­ãƒƒã‚¯æ“ä½œã‚¯ãƒ©ã‚¹
+# ƒuƒƒbƒN‘€ìƒNƒ‰ƒX
 ###################################################
 ###################################################
+
+
 class Block_Controller(object):
 
     ####################################
-    # èµ·å‹•æ™‚åˆæœŸåŒ–
+    # ‹N“®‰Šú‰»
     # init parameter
     board_backboard = 0
     board_data_width = 0
@@ -38,15 +40,15 @@ class Block_Controller(object):
     CurrentShape_class = 0
     NextShape_class = 0
 
-    ## ç¬¬2weight
-    # æœ‰åŠ¹ã‹ã©ã†ã‹
+    # ‘æ2weight
+    # —LŒø‚©‚Ç‚¤‚©
     weight2_available = False
-    # ã‚²ãƒ¼ãƒ é€”ä¸­ã®åˆ‡ã‚Šæ›¿ãˆãƒ•ãƒ©ã‚°
+    # ƒQ[ƒ€“r’†‚ÌØ‚è‘Ö‚¦ƒtƒ‰ƒO
     weight2_enable = False
     predict_weight2_enable_index = 0
     predict_weight2_disable_index = 0
 
-    # Debug å‡ºåŠ›
+    # Debug o—Í
     debug_flag_shift_rotation = 0
     debug_flag_shift_rotation_success = 0
     debug_flag_try_move = 0
@@ -54,7 +56,7 @@ class Block_Controller(object):
     debug_flag_move_down = 0
 
     ####################################
-    # èµ·å‹•æ™‚åˆæœŸåŒ–
+    # ‹N“®‰Šú‰»
     ####################################
     def __init__(self):
         # init parameter
@@ -65,45 +67,47 @@ class Block_Controller(object):
         self.init_predict_parameter_flag = False
 
     ####################################
-    # Yaml ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿èª­ã¿è¾¼ã¿
+    # Yaml ƒpƒ‰ƒ[ƒ^“Ç‚İ‚İ
     ####################################
-    def yaml_read(self,yaml_file):
+    def yaml_read(self, yaml_file):
         with open(yaml_file, encoding='utf-8') as f:
             cfg = yaml.safe_load(f)
         return cfg
 
     ####################################
-    # åˆæœŸ parameter ã‚’è¨­å®š
+    # ‰Šú parameter ‚ğİ’è
     ####################################
-    def set_parameter(self,yaml_file=None,predict_weight=None):
+    def set_parameter(self, yaml_file=None, predict_weight=None):
         self.result_warehouse = "outputs/"
         self.latest_dir = self.result_warehouse+"/latest"
         predict_weight2 = None
 
         ########
-        ## Config Yaml èª­ã¿è¾¼ã¿
+        # Config Yaml “Ç‚İ‚İ
         if yaml_file is None:
             raise Exception('Please input train_yaml file.')
         elif not os.path.exists(yaml_file):
-            raise Exception('The yaml file {} is not existed.'.format(yaml_file))
+            raise Exception(
+                'The yaml file {} is not existed.'.format(yaml_file))
         cfg = self.yaml_read(yaml_file)
 
         ########
-        ## å­¦ç¿’ã®å ´åˆ
-        if self.mode=="train" or self.mode=="train_sample" or self.mode=="train_sample2":
-            # ouput dir ã¨ã—ã¦æ—¥ä»˜ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªä½œæˆ
+        # ŠwK‚Ìê‡
+        if self.mode == "train" or self.mode == "train_sample" or self.mode == "train_sample2":
+            # ouput dir ‚Æ‚µ‚Ä“ú•tƒfƒBƒŒƒNƒgƒŠì¬
             dt = datetime.now()
-            self.output_dir = self.result_warehouse+ dt.strftime("%Y-%m-%d-%H-%M-%S")
-            os.makedirs(self.output_dir,exist_ok=True)
-            
-            # weight_dir ã¨ã—ã¦ output_dir ä¸‹ã« trained model ãƒ•ã‚©ãƒ«ãƒ€ã‚’ output_dir å‚˜ä¸‹ã«ä½œã‚‹
+            self.output_dir = self.result_warehouse + \
+                dt.strftime("%Y-%m-%d-%H-%M-%S")
+            os.makedirs(self.output_dir, exist_ok=True)
+
+            # weight_dir ‚Æ‚µ‚Ä output_dir ‰º‚É trained model ƒtƒHƒ‹ƒ_‚ğ output_dir P‰º‚Éì‚é
             self.weight_dir = self.output_dir+"/trained_model/"
             self.best_weight = self.weight_dir + "best_weight.pt"
-            os.makedirs(self.weight_dir,exist_ok=True)
+            os.makedirs(self.weight_dir, exist_ok=True)
         ########
-        ## æ¨è«–ã®å ´åˆ
+        # „˜_‚Ìê‡
         else:
-            ## Config Yaml ã§æŒ‡å®šã®å ´åˆ
+            # Config Yaml ‚Åw’è‚Ìê‡
             predict_weight_cfg = True
             if ('predict_weight' in cfg["common"]) \
                     and (predict_weight == "outputs/latest/best_weight.pt"):
@@ -114,12 +118,12 @@ class Block_Controller(object):
 
             dirname = os.path.dirname(predict_weight)
             self.output_dir = dirname + "/predict/"
-            os.makedirs(self.output_dir,exist_ok=True)
+            os.makedirs(self.output_dir, exist_ok=True)
 
-            ## ç¬¬2 model
+            # ‘æ2 model
             self.weight2_available = False
             self.weight2_enable = False
-            # config yaml ã® weight2_available ãŒ True, ã‹ã¤ predict_weight2 ãŒã‚ã‚Šã‹ã¤ predict_weight ãŒæŒ‡å®šã§ãªã„å ´åˆ
+            # config yaml ‚Ì weight2_available ‚ª True, ‚©‚Â predict_weight2 ‚ª‚ ‚è‚©‚Â predict_weight ‚ªw’è‚Å‚È‚¢ê‡
             if ('weight2_available' in cfg["common"]) \
                     and cfg["common"]["weight2_available"] \
                     and cfg["common"]["predict_weight2"] != None \
@@ -130,129 +134,132 @@ class Block_Controller(object):
                 self.predict_weight2_disable_index = cfg["common"]["predict_weight2_disable_index"]
 
         ####################
-        # default.yaml ã‚’ output_dir ã«ã‚³ãƒ”ãƒ¼ã—ã¦ãŠã
-        #subprocess.run("cp config/default.yaml %s/"%(self.output_dir), shell=True)
+        # default.yaml ‚ğ output_dir ‚ÉƒRƒs[‚µ‚Ä‚¨‚­
+        # subprocess.run("cp config/default.yaml %s/"%(self.output_dir), shell=True)
         shutil.copy2(yaml_file, self.output_dir)
 
-        # Tensorboard å‡ºåŠ›ãƒ•ã‚©ãƒ«ãƒ€è¨­å®š
-        self.writer = SummaryWriter(self.output_dir+"/"+cfg["common"]["log_path"])
+        # Tensorboard o—ÍƒtƒHƒ‹ƒ_İ’è
+        self.writer = SummaryWriter(
+            self.output_dir+"/"+cfg["common"]["log_path"])
 
         ####################
-        # ãƒ­ã‚°ãƒ•ã‚¡ã‚¤ãƒ«è¨­å®š
+        # ƒƒOƒtƒ@ƒCƒ‹İ’è
         ########
-        # æ¨è«–ã®å ´åˆ
-        if self.mode=="predict" or self.mode=="predict_sample":
+        # „˜_‚Ìê‡
+        if self.mode == "predict" or self.mode == "predict_sample":
             self.log = self.output_dir+"/log_predict.txt"
             self.log_score = self.output_dir+"/score_predict.txt"
             self.log_reward = self.output_dir+"/reward_predict.txt"
         ########
-        # å­¦ç¿’ã®å ´åˆ
+        # ŠwK‚Ìê‡
         else:
             self.log = self.output_dir+"/log_train.txt"
             self.log_score = self.output_dir+"/score_train.txt"
             self.log_reward = self.output_dir+"/reward_train.txt"
 
-        #ãƒ­ã‚°
-        with open(self.log,"w") as f:
+        # ƒƒO
+        with open(self.log, "w") as f:
             print("start...", file=f)
 
-        #ã‚¹ã‚³ã‚¢ãƒ­ã‚°
-        with open(self.log_score,"w") as f:
+        # ƒXƒRƒAƒƒO
+        with open(self.log_score, "w") as f:
             print(0, file=f)
 
-        #å ±é…¬ãƒ­ã‚°
-        with open(self.log_reward,"w") as f:
+        # •ñVƒƒO
+        with open(self.log_reward, "w") as f:
             print(0, file=f)
 
-        # Move Down é™ä¸‹æœ‰åŠ¹åŒ–
+        # Move Down ~‰º—LŒø‰»
         if 'move_down_flag' in cfg["train"]:
             self.move_down_flag = cfg["train"]["move_down_flag"]
         else:
             self.move_down_flag = 0
 
-        # æ¬¡ã®ãƒ†ãƒˆãƒªãƒŸãƒäºˆæ¸¬æ•°
-        if cfg["model"]["name"]=="DQN" and ('predict_next_num' in cfg["train"]):
+        # Ÿ‚ÌƒeƒgƒŠƒ~ƒm—\‘ª”
+        if cfg["model"]["name"] == "DQN" and ('predict_next_num' in cfg["train"]):
             self.predict_next_num = cfg["train"]["predict_next_num"]
         else:
             self.predict_next_num = 0
 
-        # æ¬¡ã®ãƒ†ãƒˆãƒªãƒŸãƒå€™è£œæ•°
-        if cfg["model"]["name"]=="DQN" and ('predict_next_steps' in cfg["train"]):
+        # Ÿ‚ÌƒeƒgƒŠƒ~ƒmŒó•â”
+        if cfg["model"]["name"] == "DQN" and ('predict_next_steps' in cfg["train"]):
             self.predict_next_steps = cfg["train"]["predict_next_steps"]
         else:
             self.predict_next_steps = 0
 
-        # æ¬¡ã®ãƒ†ãƒˆãƒªãƒŸãƒäºˆæ¸¬æ•° (å­¦ç¿’æ™‚)
-        if cfg["model"]["name"]=="DQN" and ('predict_next_num_train' in cfg["train"]):
+        # Ÿ‚ÌƒeƒgƒŠƒ~ƒm—\‘ª” (ŠwK)
+        if cfg["model"]["name"] == "DQN" and ('predict_next_num_train' in cfg["train"]):
             self.predict_next_num_train = cfg["train"]["predict_next_num_train"]
         else:
             self.predict_next_num_train = 0
 
-        # æ¬¡ã®ãƒ†ãƒˆãƒªãƒŸãƒå€™è£œæ•° (å­¦ç¿’æ™‚)
-        if cfg["model"]["name"]=="DQN" and ('predict_next_steps_train' in cfg["train"]):
+        # Ÿ‚ÌƒeƒgƒŠƒ~ƒmŒó•â” (ŠwK)
+        if cfg["model"]["name"] == "DQN" and ('predict_next_steps_train' in cfg["train"]):
             self.predict_next_steps_train = cfg["train"]["predict_next_steps_train"]
         else:
             self.predict_next_steps_train = 0
 
-        # çµ‚äº†æ™‚åˆ»è¡¨ç¤º
+        # I—¹•\¦
         if 'time_disp' in cfg["common"]:
             self.time_disp = cfg["common"]["time_disp"]
         else:
             self.time_disp = False
 
         ####################
-        #=====Set tetris parameter=====
-        # Tetris ã‚²ãƒ¼ãƒ æŒ‡å®š
-        # self.board_data_width , self.board_data_height ã¨äºŒé‡æŒ‡å®šã€çµ±åˆå¿…è¦
+        # =====Set tetris parameter=====
+        # Tetris ƒQ[ƒ€w’è
+        # self.board_data_width , self.board_data_height ‚Æ“ñdw’èA“‡•K—v
         self.height = cfg["tetris"]["board_height"]
         self.width = cfg["tetris"]["board_width"]
-        
-        # æœ€å¤§ãƒ†ãƒˆãƒªãƒŸãƒ
-        self.max_tetrominoes = cfg["tetris"]["max_tetrominoes"]
-        
-        ####################
-        # ãƒ‹ãƒ¥ãƒ¼ãƒ©ãƒ«ãƒãƒƒãƒˆãƒ¯ãƒ¼ã‚¯ã®å…¥åŠ›æ•°
-        self.state_dim = cfg["state"]["dim"]
-        # å­¦ç¿’+æ¨è«–æ–¹å¼
-        print("model name: %s"%(cfg["model"]["name"]))
 
-        ### config/default.yaml ã§é¸æŠ
-        ## MLP ã®å ´åˆ
-        if cfg["model"]["name"]=="MLP":
-            #=====load MLP=====
-            # model/deepnet.py ã® MLP èª­ã¿è¾¼ã¿
+        # Å‘åƒeƒgƒŠƒ~ƒm
+        self.max_tetrominoes = cfg["tetris"]["max_tetrominoes"]
+
+        ####################
+        # ƒjƒ…[ƒ‰ƒ‹ƒlƒbƒgƒ[ƒN‚Ì“ü—Í”
+        self.state_dim = cfg["state"]["dim"]
+        # ŠwK+„˜_•û®
+        print("model name: %s" % (cfg["model"]["name"]))
+
+        # config/default.yaml ‚Å‘I‘ğ
+        # MLP ‚Ìê‡
+        if cfg["model"]["name"] == "MLP":
+            # =====load MLP=====
+            # model/deepnet.py ‚Ì MLP “Ç‚İ‚İ
             from machine_learning.model.deepqnet import MLP
-            # å…¥åŠ›æ•°è¨­å®šã—ã¦ MLP ãƒ¢ãƒ‡ãƒ«ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ä½œæˆ
+            # “ü—Í”İ’è‚µ‚Ä MLP ƒ‚ƒfƒ‹ƒCƒ“ƒXƒ^ƒ“ƒXì¬
             self.model = MLP(self.state_dim)
-            # åˆæœŸçŠ¶æ…‹è¦å®š
-            self.initial_state = torch.FloatTensor([0 for i in range(self.state_dim)])
-            #å„é–¢æ•°è¦å®š
+            # ‰Šúó‘Ô‹K’è
+            self.initial_state = torch.FloatTensor(
+                [0 for i in range(self.state_dim)])
+            # ŠeŠÖ”‹K’è
             self.get_next_func = self.get_next_states
             self.reward_func = self.step
-            # å ±é…¬é–¢é€£è¦å®š
+            # •ñVŠÖ˜A‹K’è
             self.reward_weight = cfg["train"]["reward_weight"]
-            # ç©´ã®ä¸Šã®ç©ã¿ä¸Šã’ãƒšãƒŠãƒ«ãƒ†ã‚£
+            # ŒŠ‚Ìã‚ÌÏ‚İã‚°ƒyƒiƒ‹ƒeƒB
             self.hole_top_limit = 1
-            # ç©´ã®ä¸Šã®ç©ã¿ä¸Šã’ãƒšãƒŠãƒ«ãƒ†ã‚£ä¸‹é™çµ¶å¯¾é«˜ã•
+            # ŒŠ‚Ìã‚ÌÏ‚İã‚°ƒyƒiƒ‹ƒeƒB‰ºŒÀâ‘Î‚‚³
             self.hole_top_limit_height = -1
 
-        # DQN ã®å ´åˆ
-        elif cfg["model"]["name"]=="DQN":
-            #=====load Deep Q Network=====
+        # DQN ‚Ìê‡
+        elif cfg["model"]["name"] == "DQN":
+            # =====load Deep Q Network=====
             from machine_learning.model.deepqnet import DeepQNetwork
-            # DQN ãƒ¢ãƒ‡ãƒ«ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ä½œæˆ
+            # DQN ƒ‚ƒfƒ‹ƒCƒ“ƒXƒ^ƒ“ƒXì¬
             self.model = DeepQNetwork()
             if self.weight2_available:
                 self.model2 = DeepQNetwork()
 
-            # åˆæœŸçŠ¶æ…‹è¦å®š
-            self.initial_state = torch.FloatTensor([[[0 for i in range(10)] for j in range(22)]])
-            #å„é–¢æ•°è¦å®š
+            # ‰Šúó‘Ô‹K’è
+            self.initial_state = torch.FloatTensor(
+                [[[0 for i in range(10)] for j in range(22)]])
+            # ŠeŠÖ”‹K’è
             self.get_next_func = self.get_next_states_v2
             self.reward_func = self.step_v2
-            # å ±é…¬é–¢é€£è¦å®š
+            # •ñVŠÖ˜A‹K’è
             self.reward_weight = cfg["train"]["reward_weight"]
-            
+
             if 'tetris_fill_reward' in cfg["train"]:
                 self.tetris_fill_reward = cfg["train"]["tetris_fill_reward"]
             else:
@@ -270,21 +277,21 @@ class Block_Controller(object):
             else:
                 self.height_line_reward = 0
             print("height_line_reward:", self.height_line_reward)
-    
+
             if 'hole_top_limit_reward' in cfg["train"]:
                 self.hole_top_limit_reward = cfg["train"]["hole_top_limit_reward"]
             else:
                 self.hole_top_limit_reward = 0
             print("hole_top_limit_reward:", self.hole_top_limit_reward)
-    
-            # ç©´ã®ä¸Šã®ç©ã¿ä¸Šã’ãƒšãƒŠãƒ«ãƒ†ã‚£
+
+            # ŒŠ‚Ìã‚ÌÏ‚İã‚°ƒyƒiƒ‹ƒeƒB
             if 'hole_top_limit' in cfg["train"]:
                 self.hole_top_limit = cfg["train"]["hole_top_limit"]
             else:
                 self.hole_top_limit = 1
             print("hole_top_limit:", self.hole_top_limit)
-    
-            # ç©´ã®ä¸Šã®ç©ã¿ä¸Šã’ãƒšãƒŠãƒ«ãƒ†ã‚£ä¸‹é™çµ¶å¯¾é«˜ã•
+
+            # ŒŠ‚Ìã‚ÌÏ‚İã‚°ƒyƒiƒ‹ƒeƒB‰ºŒÀâ‘Î‚‚³
             if 'hole_top_limit_height' in cfg["train"]:
                 self.hole_top_limit_height = cfg["train"]["hole_top_limit_height"]
             else:
@@ -297,32 +304,29 @@ class Block_Controller(object):
                 self.left_side_height_penalty = 0
             print("left_side_height_penalty:", self.left_side_height_penalty)
 
-
-        # å…±é€šå ±é…¬é–¢é€£è¦å®š
+        # ‹¤’Ê•ñVŠÖ˜A‹K’è
         if 'bumpiness_left_side_relax' in cfg["train"]:
             self.bumpiness_left_side_relax = cfg["train"]["bumpiness_left_side_relax"]
         else:
             self.bumpiness_left_side_relax = 0
         print("bumpiness_left_side_relax:", self.bumpiness_left_side_relax)
-            
+
         if 'max_height_relax' in cfg["train"]:
             self.max_height_relax = cfg["train"]["max_height_relax"]
         else:
             self.max_height_relax = 0
         print("max_height_relax:", self.max_height_relax)
 
-
-
         ####################
-        # æ¨è«–ã®å ´åˆ æ¨è«–ã‚¦ã‚§ã‚¤ãƒˆã‚’ torchã€€ã§èª­ã¿è¾¼ã¿ model ã«å…¥ã‚Œã‚‹ã€‚
-        if self.mode=="predict" or self.mode=="predict_sample":
-            if not predict_weight=="None":
+        # „˜_‚Ìê‡ „˜_ƒEƒFƒCƒg‚ğ torch@‚Å“Ç‚İ‚İ model ‚É“ü‚ê‚éB
+        if self.mode == "predict" or self.mode == "predict_sample":
+            if not predict_weight == "None":
                 if os.path.exists(predict_weight):
                     print("Load {}...".format(predict_weight))
-                    # æ¨è«–ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ä½œæˆ
+                    # „˜_ƒCƒ“ƒXƒ^ƒ“ƒXì¬
                     self.model = torch.load(predict_weight)
-                    # ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ã‚’æ¨è«–ãƒ¢ãƒ¼ãƒ‰ã«åˆ‡ã‚Šæ›¿ãˆ
-                    self.model.eval()    
+                    # ƒCƒ“ƒXƒ^ƒ“ƒX‚ğ„˜_ƒ‚[ƒh‚ÉØ‚è‘Ö‚¦
+                    self.model.eval()
                 else:
                     print("{} is not existed!!".format(predict_weight))
                     exit()
@@ -330,309 +334,321 @@ class Block_Controller(object):
                 print("Please set predict_weight!!")
                 exit()
 
-            ## ç¬¬2 model
-            if self.weight2_available and (not predict_weight2=="None"):
+            # ‘æ2 model
+            if self.weight2_available and (not predict_weight2 == "None"):
                 if os.path.exists(predict_weight2):
                     print("Load2 {}...".format(predict_weight2))
-                    # æ¨è«–ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ä½œæˆ
+                    # „˜_ƒCƒ“ƒXƒ^ƒ“ƒXì¬
                     self.model2 = torch.load(predict_weight2)
-                    # ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ã‚’æ¨è«–ãƒ¢ãƒ¼ãƒ‰ã«åˆ‡ã‚Šæ›¿ãˆ
-                    self.model2.eval()    
+                    # ƒCƒ“ƒXƒ^ƒ“ƒX‚ğ„˜_ƒ‚[ƒh‚ÉØ‚è‘Ö‚¦
+                    self.model2.eval()
                 else:
                     print("{} is not existed!!(predict 2)".format(predict_weight))
                     exit()
 
         ####################
-        #### finetune ã®å ´åˆ
-        #(ä»¥å‰ã®å­¦ç¿’çµæœã‚’ä½¿ã†å ´åˆã€€
+        # finetune ‚Ìê‡
+        # (ˆÈ‘O‚ÌŠwKŒ‹‰Ê‚ğg‚¤ê‡@
         elif cfg["model"]["finetune"]:
-            # weight ãƒ•ã‚¡ã‚¤ãƒ«(ä»¥å‰ã®å­¦ç¿’ãƒ•ã‚¡ã‚¤ãƒ«)ã‚’æŒ‡å®š
+            # weight ƒtƒ@ƒCƒ‹(ˆÈ‘O‚ÌŠwKƒtƒ@ƒCƒ‹)‚ğw’è
             self.ft_weight = cfg["common"]["ft_weight"]
             if not self.ft_weight is None:
-                ## èª­ã¿è¾¼ã‚“ã§ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ä½œæˆ
+                # “Ç‚İ‚ñ‚ÅƒCƒ“ƒXƒ^ƒ“ƒXì¬
                 self.model = torch.load(self.ft_weight)
-                ## ãƒ­ã‚°ã¸å‡ºåŠ›
-                with open(self.log,"a") as f:
-                    print("Finetuning mode\nLoad {}...".format(self.ft_weight), file=f)
-                
-        ## GPU ä½¿ç”¨ã§ãã‚‹ã¨ãã¯ä½¿ã†
+                # ƒƒO‚Öo—Í
+                with open(self.log, "a") as f:
+                    print("Finetuning mode\nLoad {}...".format(
+                        self.ft_weight), file=f)
+
+        # GPU g—p‚Å‚«‚é‚Æ‚«‚Íg‚¤
 #        if torch.cuda.is_available():
 #            self.model.cuda()
-        
-        #=====Set hyper parameter=====
-        #  å­¦ç¿’ãƒãƒƒãƒã‚µã‚¤ã‚º(å­¦ç¿’ã®åˆ†å‰²å˜ä½, ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚ºã‚’åˆ†å‰²ã—ã¦ã„ã‚‹)
+
+        # =====Set hyper parameter=====
+        #  ŠwKƒoƒbƒ`ƒTƒCƒY(ŠwK‚Ì•ªŠ„’PˆÊ, ƒf[ƒ^ƒTƒCƒY‚ğ•ªŠ„‚µ‚Ä‚¢‚é)
         self.batch_size = cfg["train"]["batch_size"]
-        # lr = learning rateã€€å­¦ç¿’ç‡
+        # lr = learning rate@ŠwK—¦
         self.lr = cfg["train"]["lr"]
-        # pytorch äº’æ›æ€§ã®ãŸã‚float ã«å¤‰æ›
-        if not isinstance(self.lr,float):
+        # pytorch ŒİŠ·«‚Ì‚½‚ßfloat ‚É•ÏŠ·
+        if not isinstance(self.lr, float):
             self.lr = float(self.lr)
-        # ãƒªãƒ—ãƒ¬ã‚¤ãƒ¡ãƒ¢ãƒªã‚µã‚¤ã‚º
+        # ƒŠƒvƒŒƒCƒƒ‚ƒŠƒTƒCƒY
         self.replay_memory_size = cfg["train"]["replay_memory_size"]
         self.replay_memory = deque(maxlen=self.replay_memory_size)
-        # æœ€å¤§ Episode ã‚µã‚¤ã‚º = æœ€å¤§ãƒ†ãƒˆãƒªãƒŸãƒæ•°
-        # 1 Episode = 1 ãƒ†ãƒˆãƒªãƒŸãƒ
+        # Å‘å Episode ƒTƒCƒY = Å‘åƒeƒgƒŠƒ~ƒm”
+        # 1 Episode = 1 ƒeƒgƒŠƒ~ƒm
         self.max_episode_size = self.max_tetrominoes
         self.episode_memory = deque(maxlen=self.max_episode_size)
-        # å­¦ç¿’ç‡æ¸›è¡°åŠ¹æœã‚’å‡ºã™ EPOCH æ•°ã€€(1 EPOCH = 1ã‚²ãƒ¼ãƒ )
+        # ŠwK—¦Œ¸ŠŒø‰Ê‚ğo‚· EPOCH ”@(1 EPOCH = 1ƒQ[ƒ€)
         self.num_decay_epochs = cfg["train"]["num_decay_epochs"]
-        # EPOCH æ•°
+        # EPOCH ”
         self.num_epochs = cfg["train"]["num_epoch"]
-        # epsilon: éå»ã®å­¦ç¿’çµæœã‹ã‚‰å¤‰æ›´ã™ã‚‹å‰²åˆ initial ã¯åˆæœŸå€¤ã€final ã¯æœ€çµ‚å€¤
-        # Fine Tuning æ™‚ã¯ initial ã‚’å°ã•ã‚ã«
+        # epsilon: ‰ß‹‚ÌŠwKŒ‹‰Ê‚©‚ç•ÏX‚·‚éŠ„‡ initial ‚Í‰Šú’lAfinal ‚ÍÅI’l
+        # Fine Tuning ‚Í initial ‚ğ¬‚³‚ß‚É
         self.initial_epsilon = cfg["train"]["initial_epsilon"]
         self.final_epsilon = cfg["train"]["final_epsilon"]
-        # pytorch äº’æ›æ€§ã®ãŸã‚float ã«å¤‰æ›
-        if not isinstance(self.final_epsilon,float):
+        # pytorch ŒİŠ·«‚Ì‚½‚ßfloat ‚É•ÏŠ·
+        if not isinstance(self.final_epsilon, float):
             self.final_epsilon = float(self.final_epsilon)
 
-        ## æå¤±é–¢æ•°ï¼ˆäºˆæ¸¬å€¤ã¨ã€å®Ÿéš›ã®æ­£è§£å€¤ã®èª¤å·®ï¼‰ã¨å‹¾é…æ³•(ADAM or SGD) ã®æ±ºå®š 
-        #=====Set loss function and optimizer=====
-        # ADAM ã®å ´åˆ .... ç§»å‹•å¹³å‡ã§æŒ¯å‹•ã‚’æŠ‘åˆ¶ã™ã‚‹ãƒ¢ãƒ¼ãƒ¡ãƒ³ã‚¿ãƒ  ã¨ å­¦ç¿’ç‡ã‚’èª¿æ•´ã—ã¦æŒ¯å‹•ã‚’æŠ‘åˆ¶ã™ã‚‹RMSProp ã‚’çµ„ã¿åˆã‚ã›ã¦ã„ã‚‹
-        if cfg["train"]["optimizer"]=="Adam" or cfg["train"]["optimizer"]=="ADAM":
-            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+        # ‘¹¸ŠÖ”i—\‘ª’l‚ÆAÀÛ‚Ì³‰ğ’l‚ÌŒë·j‚ÆŒù”z–@(ADAM or SGD) ‚ÌŒˆ’è
+        # =====Set loss function and optimizer=====
+        # ADAM ‚Ìê‡ .... ˆÚ“®•½‹Ï‚ÅU“®‚ğ—}§‚·‚éƒ‚[ƒƒ“ƒ^ƒ€ ‚Æ ŠwK—¦‚ğ’²®‚µ‚ÄU“®‚ğ—}§‚·‚éRMSProp ‚ğ‘g‚İ‡‚í‚¹‚Ä‚¢‚é
+        if cfg["train"]["optimizer"] == "Adam" or cfg["train"]["optimizer"] == "ADAM":
+            self.optimizer = torch.optim.Adam(
+                self.model.parameters(), lr=self.lr)
             self.scheduler = None
-        # ADAM ã§ãªã„å ´åˆSGD (ç¢ºç‡çš„å‹¾é…é™ä¸‹æ³•ã€ãƒ¢ãƒ¼ãƒ¡ãƒ³ã‚¿ãƒ ã‚‚ STEP SIZE ã‚‚å­¦ç¿’ç‡Î³ã‚‚ã‚¹ã‚±ã‚¸ãƒ¥ãƒ¼ãƒ©ã‚‚è¨­å®š)
+        # ADAM ‚Å‚È‚¢ê‡SGD (Šm—¦“IŒù”z~‰º–@Aƒ‚[ƒƒ“ƒ^ƒ€‚à STEP SIZE ‚àŠwK—¦ƒÁ‚àƒXƒPƒWƒ…[ƒ‰‚àİ’è)
         else:
-            # ãƒ¢ãƒ¼ãƒ¡ãƒ³ã‚¿ãƒ è¨­å®šã€€ä»Šã¾ã§ã®ç§»å‹•ã¨ã“ã‚Œã‹ã‚‰å‹•ãã¹ãç§»å‹•ã®å¹³å‡ã‚’ã¨ã‚ŠæŒ¯å‹•ã‚’é˜²ããŸã‚ã®é–¢æ•°
-            self.momentum =cfg["train"]["lr_momentum"] 
-            # SGD ã«è¨­å®š
-            self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, momentum=self.momentum)
-            # å­¦ç¿’ç‡æ›´æ–°ã‚¿ã‚¤ãƒŸãƒ³ã‚°ã® EPOCH æ•°
+            # ƒ‚[ƒƒ“ƒ^ƒ€İ’è@¡‚Ü‚Å‚ÌˆÚ“®‚Æ‚±‚ê‚©‚ç“®‚­‚×‚«ˆÚ“®‚Ì•½‹Ï‚ğ‚Æ‚èU“®‚ğ–h‚®‚½‚ß‚ÌŠÖ”
+            self.momentum = cfg["train"]["lr_momentum"]
+            # SGD ‚Éİ’è
+            self.optimizer = torch.optim.SGD(
+                self.model.parameters(), lr=self.lr, momentum=self.momentum)
+            # ŠwK—¦XVƒ^ƒCƒ~ƒ“ƒO‚Ì EPOCH ”
             self.lr_step_size = cfg["train"]["lr_step_size"]
-            # å­¦ç¿’ç‡Î³è¨­å®šã€€...  Step Size é€²ã‚“ã  EPOCH ã§ gammma ãŒå­¦ç¿’ç‡ã«ä¹—ç®—ã•ã‚Œã‚‹
+            # ŠwK—¦ƒÁİ’è@...  Step Size i‚ñ‚¾ EPOCH ‚Å gammma ‚ªŠwK—¦‚ÉæZ‚³‚ê‚é
             self.lr_gamma = cfg["train"]["lr_gamma"]
-            # å­¦ç¿’ç‡ã‚¹ã‚±ã‚¸ãƒ¥ãƒ¼ãƒ©
-            self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.lr_step_size , gamma=self.lr_gamma)
-        # èª¤å·®é–¢æ•° - MSELoss å¹³å‡äºŒä¹—èª¤å·®
+            # ŠwK—¦ƒXƒPƒWƒ…[ƒ‰
+            self.scheduler = torch.optim.lr_scheduler.StepLR(
+                self.optimizer, step_size=self.lr_step_size, gamma=self.lr_gamma)
+        # Œë·ŠÖ” - MSELoss •½‹Ï“ñæŒë·
         self.criterion = nn.MSELoss()
 
-        ####å„ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿åˆæœŸåŒ–
-        ####=====Initialize parameter=====
-        #1EPOCH ... 1è©¦è¡Œ
+        # Šeƒpƒ‰ƒ[ƒ^‰Šú‰»
+        # =====Initialize parameter=====
+        # 1EPOCH ... 1s
         self.epoch = 0
         self.score = 0
         self.max_score = -99999
         self.epoch_reward = 0
         self.cleared_lines = 0
-        self.cleared_col = [0,0,0,0,0]
-        self.iter = 0 
-        # åˆæœŸã‚¹ãƒ†ãƒ¼ãƒˆ
-        self.state = self.initial_state 
-        # ãƒ†ãƒˆãƒªãƒŸãƒ0
+        self.cleared_col = [0, 0, 0, 0, 0]
+        self.iter = 0
+        # ‰ŠúƒXƒe[ƒg
+        self.state = self.initial_state
+        # ƒeƒgƒŠƒ~ƒm0
         self.tetrominoes = 0
 
-        # å‰ã®ã‚¿ãƒ¼ãƒ³ã§ Drop ã‚’ã‚¹ã‚­ãƒƒãƒ—ã—ã¦ã„ãŸã‹ï¼Ÿ (-1: ã—ã¦ã„ãªã„, ãã‚Œä»¥å¤–: ã—ã¦ã„ãŸ)
+        # ‘O‚Ìƒ^[ƒ“‚Å Drop ‚ğƒXƒLƒbƒv‚µ‚Ä‚¢‚½‚©H (-1: ‚µ‚Ä‚¢‚È‚¢, ‚»‚êˆÈŠO: ‚µ‚Ä‚¢‚½)
         # third_y, forth_direction, fifth_x
         self.skip_drop = [-1, -1, -1]
 
-        # Î³ å‰²å¼•ç‡ = å°†æ¥ã®ä¾¡å€¤ã‚’ã©ã®ç¨‹åº¦ä¸‹ã’ã‚‹ã‹
+        # ƒÁ Š„ˆø—¦ = «—ˆ‚Ì‰¿’l‚ğ‚Ç‚Ì’ö“x‰º‚°‚é‚©
         self.gamma = cfg["train"]["gamma"]
-        # å ±é…¬ã‚’1 ã§æ­£è¦åŒ–ã™ã‚‹ã‹ã©ã†ã‹ã€ãŸã ã—æ¶ˆå»å ±é…¬ã®ã¿ã€€
+        # •ñV‚ğ1 ‚Å³‹K‰»‚·‚é‚©‚Ç‚¤‚©A‚½‚¾‚µÁ‹•ñV‚Ì‚İ@
         self.reward_clipping = cfg["train"]["reward_clipping"]
 
         self.score_list = cfg["tetris"]["score_list"]
-        # å ±é…¬èª­ã¿è¾¼ã¿
+        # •ñV“Ç‚İ‚İ
         self.reward_list = cfg["train"]["reward_list"]
-        # Game Over å ±é…¬ = Penalty
-        self.penalty =  self.reward_list[5]
+        # Game Over •ñV = Penalty
+        self.penalty = self.reward_list[5]
 
         ########
-        # å ±é…¬ã‚’ 1 ã§æ­£è¦åŒ–ã€ãŸã ã—æ¶ˆå»å ±é…¬ã®ã¿...Qå€¤ã®æ€¥æ¿€ãªå¤‰å‹•æŠ‘åˆ¶
-        #=====Reward clipping=====
+        # •ñV‚ğ 1 ‚Å³‹K‰»A‚½‚¾‚µÁ‹•ñV‚Ì‚İ...Q’l‚Ì‹}Œƒ‚È•Ï“®—}§
+        # =====Reward clipping=====
         if self.reward_clipping:
-            # å ±é…¬ãƒªã‚¹ãƒˆã¨ãƒšãƒŠãƒ«ãƒ†ã‚£(GAMEOVER å ±é…¬)ãƒªã‚¹ãƒˆã®çµ¶å¯¾å€¤ã®æœ€å¤§ã‚’ã¨ã‚‹
-            self.norm_num =max(max(self.reward_list),abs(self.penalty))            
-            # æœ€å¤§å€¤ã§å‰²ã£ãŸå€¤ã‚’æ”¹ã‚ã¦å ±é…¬ãƒªã‚¹ãƒˆã¨ã™ã‚‹
-            self.reward_list =[r/self.norm_num for r in self.reward_list]
-            # ãƒšãƒŠãƒ«ãƒ†ã‚£ãƒªã‚¹ãƒˆã‚‚åŒã˜ã‚ˆã†ã«ã™ã‚‹
+            # •ñVƒŠƒXƒg‚Æƒyƒiƒ‹ƒeƒB(GAMEOVER •ñV)ƒŠƒXƒg‚Ìâ‘Î’l‚ÌÅ‘å‚ğ‚Æ‚é
+            self.norm_num = max(max(self.reward_list), abs(self.penalty))
+            # Å‘å’l‚ÅŠ„‚Á‚½’l‚ğ‰ü‚ß‚Ä•ñVƒŠƒXƒg‚Æ‚·‚é
+            self.reward_list = [r/self.norm_num for r in self.reward_list]
+            # ƒyƒiƒ‹ƒeƒBƒŠƒXƒg‚à“¯‚¶‚æ‚¤‚É‚·‚é
             self.penalty /= self.norm_num
-            # max_penalty è¨­å®šã¨ penalty è¨­å®šã®å°ã•ã„æ–¹ã‚’æ–°ãŸã« ãƒšãƒŠãƒ«ãƒ†ã‚£å€¤ã¨ã™ã‚‹
-            self.penalty = min(cfg["train"]["max_penalty"],self.penalty)
+            # max_penalty İ’è‚Æ penalty İ’è‚Ì¬‚³‚¢•û‚ğV‚½‚É ƒyƒiƒ‹ƒeƒB’l‚Æ‚·‚é
+            self.penalty = min(cfg["train"]["max_penalty"], self.penalty)
 
         #########
-        #=====Double DQN=====
+        # =====Double DQN=====
         self.double_dqn = cfg["train"]["double_dqn"]
         self.target_net = cfg["train"]["target_net"]
         if self.double_dqn:
             self.target_net = True
 
-        #Target_net ON ãªã‚‰ã°
+        # Target_net ON ‚È‚ç‚Î
         if self.target_net:
             print("set target network...")
-            # æ©Ÿæ¢°å­¦ç¿’ãƒ¢ãƒ‡ãƒ«è¤‡è£½
+            # ‹@ŠBŠwKƒ‚ƒfƒ‹•¡»
             self.target_model = copy.deepcopy(self.model)
             self.target_copy_intarval = cfg["train"]["target_copy_intarval"]
 
         ########
-        #=====Prioritized Experience Replay=====
-        # å„ªå…ˆé †ä½ã¤ãçµŒé¨“å­¦ç¿’æœ‰åŠ¹ãªã‚‰ã°
+        # =====Prioritized Experience Replay=====
+        # —Dæ‡ˆÊ‚Â‚«ŒoŒ±ŠwK—LŒø‚È‚ç‚Î
         self.prioritized_replay = cfg["train"]["prioritized_replay"]
         if self.prioritized_replay:
             from machine_learning.qlearning import PRIORITIZED_EXPERIENCE_REPLAY as PER
-            # å„ªå…ˆé †ä½ã¤ãçµŒé¨“å­¦ç¿’è¨­å®š
-            self.PER = PER(self.replay_memory_size, gamma=self.gamma, alpha=0.7, beta=0.5)
+            # —Dæ‡ˆÊ‚Â‚«ŒoŒ±ŠwKİ’è
+            self.PER = PER(self.replay_memory_size,
+                           gamma=self.gamma, alpha=0.7, beta=0.5)
 
         ########
-        #=====Multi step learning=====
+        # =====Multi step learning=====
         self.multi_step_learning = cfg["train"]["multi_step_learning"]
         if self.multi_step_learning:
             from machine_learning.qlearning import Multi_Step_Learning as MSL
             self.multi_step_num = cfg["train"]["multi_step_num"]
-            self.MSL = MSL(step_num=self.multi_step_num,gamma=self.gamma)
+            self.MSL = MSL(step_num=self.multi_step_num, gamma=self.gamma)
 
     ####################################
-    # ãƒªã‚»ãƒƒãƒˆæ™‚ã«ã‚¹ã‚³ã‚¢è¨ˆç®—ã— episode memory ã« penalty è¿½åŠ 
-    # çµŒé¨“å­¦ç¿’ã®ãŸã‚ã« episode_memory ã‚’ replay_memory è¿½åŠ 
+    # ƒŠƒZƒbƒg‚ÉƒXƒRƒAŒvZ‚µ episode memory ‚É penalty ’Ç‰Á
+    # ŒoŒ±ŠwK‚Ì‚½‚ß‚É episode_memory ‚ğ replay_memory ’Ç‰Á
     ####################################
     def stack_replay_memory(self):
-        if self.mode=="train" or self.mode=="train_sample" or self.mode=="train_sample2":
+        if self.mode == "train" or self.mode == "train_sample" or self.mode == "train_sample2":
             self.score += self.score_list[5]
 
-            #[next_state, reward, next2_state, done]
+            # [next_state, reward, next2_state, done]
             self.episode_memory[-1][1] += self.penalty
-            self.episode_memory[-1][3] = True  #store False to done lists.
+            self.episode_memory[-1][3] = True  # store False to done lists.
             self.epoch_reward += self.penalty
             #
             if self.multi_step_learning:
                 self.episode_memory = self.MSL.arrange(self.episode_memory)
 
-            # çµŒé¨“å­¦ç¿’ã®ãŸã‚ã« episode_memory ã‚’ replay_memory è¿½åŠ 
+            # ŒoŒ±ŠwK‚Ì‚½‚ß‚É episode_memory ‚ğ replay_memory ’Ç‰Á
             self.replay_memory.extend(self.episode_memory)
-            # å®¹é‡è¶…ãˆãŸã‚‰å‰Šé™¤
+            # —e—Ê’´‚¦‚½‚çíœ
             self.episode_memory = deque(maxlen=self.max_episode_size)
         else:
             pass
 
     ####################################
-    # Game ã® Reset ã®å®Ÿæ–½ (Game Overå¾Œ)
-    # nextMove["option"]["reset_callback_function_addr"] ã¸è¨­å®š
+    # Game ‚Ì Reset ‚ÌÀ{ (Game OverŒã)
+    # nextMove["option"]["reset_callback_function_addr"] ‚Öİ’è
     ####################################
     def update(self):
 
         ##############################
-        ## å­¦ç¿’ã®å ´åˆ
+        # ŠwK‚Ìê‡
         ##############################
-        if self.mode=="train" or self.mode=="train_sample" or self.mode=="train_sample2":
-            # ãƒªã‚»ãƒƒãƒˆæ™‚ã«ã‚¹ã‚³ã‚¢è¨ˆç®—ã— episode memory ã« penalty è¿½åŠ 
-            # replay_memory ã« episode memory è¿½åŠ 
+        if self.mode == "train" or self.mode == "train_sample" or self.mode == "train_sample2":
+            # ƒŠƒZƒbƒg‚ÉƒXƒRƒAŒvZ‚µ episode memory ‚É penalty ’Ç‰Á
+            # replay_memory ‚É episode memory ’Ç‰Á
             self.stack_replay_memory()
 
             ##############################
-            ## ãƒ­ã‚°è¡¨ç¤º
+            # ƒƒO•\¦
             ##############################
-            # ãƒªãƒ—ãƒ¬ã‚¤ãƒ¡ãƒ¢ãƒªãŒ1/10ãŸã¾ã£ã¦ã„ãªã„ãªã‚‰ã€
+            # ƒŠƒvƒŒƒCƒƒ‚ƒŠ‚ª1/10‚½‚Ü‚Á‚Ä‚¢‚È‚¢‚È‚çA
             if len(self.replay_memory) < self.replay_memory_size / 10:
                 print("================pass================")
                 print("iter: {} ,meory: {}/{} , score: {}, clear line: {}, block: {}, col1-4: {}/{}/{}/{} ".format(self.iter,
-                len(self.replay_memory),self.replay_memory_size / 10,self.score,self.cleared_lines
-                ,self.tetrominoes, self.cleared_col[1], self.cleared_col[2], self.cleared_col[3], self.cleared_col[4]))
-            # ãƒªãƒ—ãƒ¬ã‚¤ãƒ¡ãƒ¢ãƒªãŒã„ã£ã±ã„ãªã‚‰
+                                                                                                                   len(self.replay_memory), self.replay_memory_size / 10, self.score, self.cleared_lines, self.tetrominoes, self.cleared_col[1], self.cleared_col[2], self.cleared_col[3], self.cleared_col[4]))
+            # ƒŠƒvƒŒƒCƒƒ‚ƒŠ‚ª‚¢‚Á‚Ï‚¢‚È‚ç
             else:
                 print("================update================")
                 self.epoch += 1
-                # å„ªå…ˆé †ä½ã¤ãçµŒé¨“å­¦ç¿’æœ‰åŠ¹ãªã‚‰
+                # —Dæ‡ˆÊ‚Â‚«ŒoŒ±ŠwK—LŒø‚È‚ç
                 if self.prioritized_replay:
-                    # replay batch index æŒ‡å®š
-                    batch, replay_batch_index = self.PER.sampling(self.replay_memory, self.batch_size)
-                # ãã†ã§ãªã„ãªã‚‰
+                    # replay batch index w’è
+                    batch, replay_batch_index = self.PER.sampling(
+                        self.replay_memory, self.batch_size)
+                # ‚»‚¤‚Å‚È‚¢‚È‚ç
                 else:
-                    # batch ç¢ºç‡çš„å‹¾é…é™ä¸‹æ³•ã«ãŠã‘ã‚‹ã€å…¨ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã®ã†ã¡ãƒ©ãƒ³ãƒ€ãƒ æŠ½å‡ºã—ã¦å‹¾é…ã‚’æ±‚ã‚ã‚‹ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã®æ•° batch_size ãªã©
-                    batch = sample(self.replay_memory, min(len(self.replay_memory), self.batch_size))
-                    
+                    # batch Šm—¦“IŒù”z~‰º–@‚É‚¨‚¯‚éA‘Sƒpƒ‰ƒ[ƒ^‚Ì‚¤‚¿ƒ‰ƒ“ƒ_ƒ€’Šo‚µ‚ÄŒù”z‚ğ‹‚ß‚éƒpƒ‰ƒ[ƒ^‚Ì” batch_size ‚È‚Ç
+                    batch = sample(self.replay_memory, min(
+                        len(self.replay_memory), self.batch_size))
 
-                # batch ã‹ã‚‰å„æƒ…å ±ã‚’å¼•ãå‡ºã™
-                # (episode memory ã®ä¸¦ã³)
-                state_batch, reward_batch, next_state_batch, done_batch = zip(*batch)
-                state_batch = torch.stack(tuple(state for state in state_batch))
-                reward_batch = torch.from_numpy(np.array(reward_batch, dtype=np.float32)[:, None])
-                next_state_batch = torch.stack(tuple(state for state in next_state_batch))
+                # batch ‚©‚çŠeî•ñ‚ğˆø‚«o‚·
+                # (episode memory ‚Ì•À‚Ñ)
+                state_batch, reward_batch, next_state_batch, done_batch = zip(
+                    *batch)
+                state_batch = torch.stack(
+                    tuple(state for state in state_batch))
+                reward_batch = torch.from_numpy(
+                    np.array(reward_batch, dtype=np.float32)[:, None])
+                next_state_batch = torch.stack(
+                    tuple(state for state in next_state_batch))
 
                 done_batch = torch.from_numpy(np.array(done_batch)[:, None])
 
                 ###########################
-                # é †ä¼æ¬ã— Q å€¤ã‚’å–å¾— (model ã® __call__ â‰’ forward)
+                # ‡“`”À‚µ Q ’l‚ğæ“¾ (model ‚Ì __call__ à forward)
                 ###########################
-                #max_next_state_batch = torch.stack(tuple(state for state in max_next_state_batch))
+                # max_next_state_batch = torch.stack(tuple(state for state in max_next_state_batch))
                 q_values = self.model(state_batch)
-                
 
                 ###################
-                # Traget net ä½¿ã†å ´åˆ
+                # Traget net g‚¤ê‡
                 if self.target_net:
-                    if self.epoch %self.target_copy_intarval==0 and self.epoch>0:
+                    if self.epoch % self.target_copy_intarval == 0 and self.epoch > 0:
                         print("target_net update...")
-                        # self.target_copy_intarval ã”ã¨ã« best_weight ã‚’ target ã«åˆ‡ã‚Šæ›¿ãˆ
+                        # self.target_copy_intarval ‚²‚Æ‚É best_weight ‚ğ target ‚ÉØ‚è‘Ö‚¦
                         self.target_model = torch.load(self.best_weight)
-                        #self.target_model = copy.copy(self.model)
-                    # ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ã‚’æ¨è«–ãƒ¢ãƒ¼ãƒ‰ã«åˆ‡ã‚Šæ›¿ãˆ
+                        # self.target_model = copy.copy(self.model)
+                    # ƒCƒ“ƒXƒ^ƒ“ƒX‚ğ„˜_ƒ‚[ƒh‚ÉØ‚è‘Ö‚¦
                     self.target_model.eval()
-                    #======predict Q(S_t+1 max_a Q(s_(t+1),a))======
-                    # ãƒ†ãƒ³ã‚½ãƒ«ã®å‹¾é…ã®è¨ˆç®—ã‚’ä¸å¯ã¨ã™ã‚‹
+                    # ======predict Q(S_t+1 max_a Q(s_(t+1),a))======
+                    # ƒeƒ“ƒ\ƒ‹‚ÌŒù”z‚ÌŒvZ‚ğ•s‰Â‚Æ‚·‚é
                     with torch.no_grad():
-                        # æ¬¡ã®æ¬¡ã®çŠ¶æ…‹ batch ã‹ã‚‰
-                        # ç¢ºç‡çš„å‹¾é…é™ä¸‹æ³•ã«ãŠã‘ã‚‹ batch ã‹ã‚‰ "ã‚¿ãƒ¼ã‚²ãƒƒãƒˆ" ãƒ¢ãƒ‡ãƒ«ã§ã® q å€¤ã‚’æ±‚ã‚ã‚‹
-                        next_prediction_batch = self.target_model(next_state_batch)
+                        # Ÿ‚ÌŸ‚Ìó‘Ô batch ‚©‚ç
+                        # Šm—¦“IŒù”z~‰º–@‚É‚¨‚¯‚é batch ‚©‚ç "ƒ^[ƒQƒbƒg" ƒ‚ƒfƒ‹‚Å‚Ì q ’l‚ğ‹‚ß‚é
+                        next_prediction_batch = self.target_model(
+                            next_state_batch)
                 else:
-                    # ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ã‚’æ¨è«–ãƒ¢ãƒ¼ãƒ‰ã«åˆ‡ã‚Šæ›¿ãˆ
+                    # ƒCƒ“ƒXƒ^ƒ“ƒX‚ğ„˜_ƒ‚[ƒh‚ÉØ‚è‘Ö‚¦
                     self.model.eval()
-                    # ãƒ†ãƒ³ã‚½ãƒ«ã®å‹¾é…ã®è¨ˆç®—ã‚’ä¸å¯ã¨ã™ã‚‹
+                    # ƒeƒ“ƒ\ƒ‹‚ÌŒù”z‚ÌŒvZ‚ğ•s‰Â‚Æ‚·‚é
                     with torch.no_grad():
-                        # ç¢ºç‡çš„å‹¾é…é™ä¸‹æ³•ã«ãŠã‘ã‚‹ batch ã‚’é †ä¼æ¬ã— Q å€¤ã‚’å–å¾— (model ã® __call__ â‰’ forward)
+                        # Šm—¦“IŒù”z~‰º–@‚É‚¨‚¯‚é batch ‚ğ‡“`”À‚µ Q ’l‚ğæ“¾ (model ‚Ì __call__ à forward)
                         next_prediction_batch = self.model(next_state_batch)
 
                 ##########################
-                # ãƒ¢ãƒ‡ãƒ«ã®å­¦ç¿’å®Ÿæ–½
+                # ƒ‚ƒfƒ‹‚ÌŠwKÀ{
                 ##########################
                 self.model.train()
-                
+
                 ##########################
-                # Multi Step lerning ã®å ´åˆ
+                # Multi Step lerning ‚Ìê‡
                 if self.multi_step_learning:
                     print("multi step learning update")
-                    y_batch = self.MSL.get_y_batch(done_batch,reward_batch, next_prediction_batch)              
+                    y_batch = self.MSL.get_y_batch(
+                        done_batch, reward_batch, next_prediction_batch)
 
-                # Multi Step lerning ã§ãªã„å ´åˆ
+                # Multi Step lerning ‚Å‚È‚¢ê‡
                 else:
-                    # done_batch, reward_bach, next_prediction_batch(Target net ãªã©æ¯”è¼ƒå¯¾è±¡ batch)
-                    # ã‚’ãã‚Œãã‚Œã¨ã‚Šã ã— done ãŒ True ãªã‚‰ reward, False (Gameover ãªã‚‰ reward + gammma * prediction Qå€¤)
-                    # ã‚’ y_batchã¨ã™ã‚‹ (gamma ã¯å‰²å¼•ç‡)
+                    # done_batch, reward_bach, next_prediction_batch(Target net ‚È‚Ç”äŠr‘ÎÛ batch)
+                    # ‚ğ‚»‚ê‚¼‚ê‚Æ‚è‚¾‚µ done ‚ª True ‚È‚ç reward, False (Gameover ‚È‚ç reward + gammma * prediction Q’l)
+                    # ‚ğ y_batch‚Æ‚·‚é (gamma ‚ÍŠ„ˆø—¦)
                     y_batch = torch.cat(
-                        tuple(reward if done[0] else reward + self.gamma * prediction for done ,reward, prediction in
-                            zip(done_batch,reward_batch, next_prediction_batch)))[:, None]
-                # æœ€é©åŒ–å¯¾è±¡ã®ã™ã¹ã¦ã®ãƒ†ãƒ³ã‚½ãƒ«ã®å‹¾é…ã‚’ 0 ã«ã™ã‚‹ (é€†ä¼æ¬backward å‰ã«å¿…é ˆ)
+                        tuple(reward if done[0] else reward + self.gamma * prediction for done, reward, prediction in
+                              zip(done_batch, reward_batch, next_prediction_batch)))[:, None]
+                # Å“K‰»‘ÎÛ‚Ì‚·‚×‚Ä‚Ìƒeƒ“ƒ\ƒ‹‚ÌŒù”z‚ğ 0 ‚É‚·‚é (‹t“`”Àbackward ‘O‚É•K{)
                 self.optimizer.zero_grad()
                 #########################
-                ## å­¦ç¿’å®Ÿæ–½ - é€†ä¼æ¬
+                # ŠwKÀ{ - ‹t“`”À
                 #########################
-                # å„ªå…ˆé †ä½ã¤ãçµŒé¨“å­¦ç¿’ã®å ´åˆ
+                # —Dæ‡ˆÊ‚Â‚«ŒoŒ±ŠwK‚Ìê‡
                 if self.prioritized_replay:
-                    # å„ªå…ˆåº¦ã®æ›´æ–°ã¨é‡ã¿ã¥ã‘å–å¾—
-                    # æ¬¡ã®çŠ¶æ…‹ã®batch index
-                    # æ¬¡ã®çŠ¶æ…‹ã®batch å ±é…¬
-                    # æ¬¡ã®çŠ¶æ…‹ã®batch ã® Q å€¤
-                    # æ¬¡ã®æ¬¡ã®çŠ¶æ…‹ã®batch ã® Q å€¤ (Target model æœ‰åŠ¹ã®å ´åˆ Target model æ›ç®—)
-                    loss_weights = self.PER.update_priority(replay_batch_index,reward_batch,q_values,next_prediction_batch)
-                    #print(loss_weights *nn.functional.mse_loss(q_values, y_batch))
-                    # èª¤å·®é–¢æ•°ã¨é‡ã¿ã¥ã‘è¨ˆç®— (q_values ãŒç¾çŠ¶ ãƒ¢ãƒ‡ãƒ«çµæœ, y_batch ãŒæ¯”è¼ƒå¯¾è±¡[Target net])
-                    loss = (loss_weights *self.criterion(q_values, y_batch)).mean()
-                    #loss = self.criterion(q_values, y_batch)
-                    
-                    # é€†ä¼æ¬-å‹¾é…è¨ˆç®—
+                    # —Dæ“x‚ÌXV‚Æd‚İ‚Ã‚¯æ“¾
+                    # Ÿ‚Ìó‘Ô‚Ìbatch index
+                    # Ÿ‚Ìó‘Ô‚Ìbatch •ñV
+                    # Ÿ‚Ìó‘Ô‚Ìbatch ‚Ì Q ’l
+                    # Ÿ‚ÌŸ‚Ìó‘Ô‚Ìbatch ‚Ì Q ’l (Target model —LŒø‚Ìê‡ Target model Š·Z)
+                    loss_weights = self.PER.update_priority(
+                        replay_batch_index, reward_batch, q_values, next_prediction_batch)
+                    # print(loss_weights *nn.functional.mse_loss(q_values, y_batch))
+                    # Œë·ŠÖ”‚Æd‚İ‚Ã‚¯ŒvZ (q_values ‚ªŒ»ó ƒ‚ƒfƒ‹Œ‹‰Ê, y_batch ‚ª”äŠr‘ÎÛ[Target net])
+                    loss = (loss_weights *
+                            self.criterion(q_values, y_batch)).mean()
+                    # loss = self.criterion(q_values, y_batch)
+
+                    # ‹t“`”À-Œù”zŒvZ
                     loss.backward()
                 else:
                     loss = self.criterion(q_values, y_batch)
-                    # é€†ä¼æ¬-å‹¾é…è¨ˆç®—
+                    # ‹t“`”À-Œù”zŒvZ
                     loss.backward()
-                # weight ã‚’å­¦ç¿’ç‡ã«åŸºã¥ãæ›´æ–°
+                # weight ‚ğŠwK—¦‚ÉŠî‚Ã‚«XV
                 self.optimizer.step()
-                # SGD ã®å ´åˆ
-                if self.scheduler!=None:
-                    # å­¦ç¿’ç‡æ›´æ–°
+                # SGD ‚Ìê‡
+                if self.scheduler != None:
+                    # ŠwK—¦XV
                     self.scheduler.step()
 
                 ###################################
-                # çµæœã®å‡ºåŠ›
+                # Œ‹‰Ê‚Ìo—Í
                 log = "Epoch: {} / {}, Score: {},  block: {},  Reward: {:.4f} Cleared lines: {}, col: {}/{}/{}/{} ".format(
                     self.epoch,
                     self.num_epochs,
@@ -644,548 +660,573 @@ class Block_Controller(object):
                     self.cleared_col[2],
                     self.cleared_col[3],
                     self.cleared_col[4]
-                    )
+                )
                 print(log)
-                with open(self.log,"a") as f:
+                with open(self.log, "a") as f:
                     print(log, file=f)
-                with open(self.log_score,"a") as f:
+                with open(self.log_score, "a") as f:
                     print(self.score, file=f)
 
-                with open(self.log_reward,"a") as f:
+                with open(self.log_reward, "a") as f:
                     print(self.epoch_reward, file=f)
 
-                # TensorBoard ã¸ã®å‡ºåŠ›
-                self.writer.add_scalar('Train/Score', self.score, self.epoch - 1) 
-                self.writer.add_scalar('Train/Reward', self.epoch_reward, self.epoch - 1)   
-                self.writer.add_scalar('Train/block', self.tetrominoes, self.epoch - 1)  
-                self.writer.add_scalar('Train/clear lines', self.cleared_lines, self.epoch - 1) 
+                # TensorBoard ‚Ö‚Ìo—Í
+                self.writer.add_scalar(
+                    'Train/Score', self.score, self.epoch - 1)
+                self.writer.add_scalar(
+                    'Train/Reward', self.epoch_reward, self.epoch - 1)
+                self.writer.add_scalar(
+                    'Train/block', self.tetrominoes, self.epoch - 1)
+                self.writer.add_scalar(
+                    'Train/clear lines', self.cleared_lines, self.epoch - 1)
 
-                self.writer.add_scalar('Train/1 line', self.cleared_col[1], self.epoch - 1) 
-                self.writer.add_scalar('Train/2 line', self.cleared_col[2], self.epoch - 1) 
-                self.writer.add_scalar('Train/3 line', self.cleared_col[3], self.epoch - 1) 
-                self.writer.add_scalar('Train/4 line', self.cleared_col[4], self.epoch - 1) 
+                self.writer.add_scalar(
+                    'Train/1 line', self.cleared_col[1], self.epoch - 1)
+                self.writer.add_scalar(
+                    'Train/2 line', self.cleared_col[2], self.epoch - 1)
+                self.writer.add_scalar(
+                    'Train/3 line', self.cleared_col[3], self.epoch - 1)
+                self.writer.add_scalar(
+                    'Train/4 line', self.cleared_col[4], self.epoch - 1)
 
             ###################################
-            # EPOCH æ•°ãŒè¦å®šæ•°ã‚’è¶…ãˆãŸã‚‰
+            # EPOCH ”‚ª‹K’è”‚ğ’´‚¦‚½‚ç
             if self.epoch > self.num_epochs:
-                # ãƒ­ã‚°å‡ºåŠ›
-                with open(self.log,"a") as f:
+                # ƒƒOo—Í
+                with open(self.log, "a") as f:
                     print("finish..", file=f)
                 if os.path.exists(self.latest_dir):
                     shutil.rmtree(self.latest_dir)
-                os.makedirs(self.latest_dir,exist_ok=True)
-                shutil.copyfile(self.best_weight,self.latest_dir+"/best_weight.pt")
+                os.makedirs(self.latest_dir, exist_ok=True)
+                shutil.copyfile(self.best_weight,
+                                self.latest_dir+"/best_weight.pt")
                 for file in glob.glob(self.output_dir+"/*.txt"):
-                    shutil.copyfile(file,self.latest_dir+"/"+os.path.basename(file))
+                    shutil.copyfile(file, self.latest_dir +
+                                    "/"+os.path.basename(file))
                 for file in glob.glob(self.output_dir+"/*.yaml"):
-                    shutil.copyfile(file,self.latest_dir+"/"+os.path.basename(file))
-                with open(self.latest_dir+"/copy_base.txt","w") as f:
+                    shutil.copyfile(file, self.latest_dir +
+                                    "/"+os.path.basename(file))
+                with open(self.latest_dir+"/copy_base.txt", "w") as f:
                     print(self.best_weight, file=f)
                 ####################
-                # çµ‚äº†
-                exit() 
+                # I—¹
+                exit()
 
         ###################################
-        # æ¨è«–ã®å ´åˆ
+        # „˜_‚Ìê‡
         else:
             self.epoch += 1
             log = "Epoch: {} / {}, Score: {},  block: {}, Reward: {:.4f} Cleared lines: {}- {}/ {}/ {}/ {}".format(
-            self.epoch,
-            self.num_epochs,
-            self.score,
-            self.tetrominoes,
-            self.epoch_reward,
-            self.cleared_lines,
-            self.cleared_col[1],
-            self.cleared_col[2],
-            self.cleared_col[3],
-            self.cleared_col[4]
+                self.epoch,
+                self.num_epochs,
+                self.score,
+                self.tetrominoes,
+                self.epoch_reward,
+                self.cleared_lines,
+                self.cleared_col[1],
+                self.cleared_col[2],
+                self.cleared_col[3],
+                self.cleared_col[4]
             )
 
         ###################################
-        # ã‚²ãƒ¼ãƒ ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿åˆæœŸåŒ–
+        # ƒQ[ƒ€ƒpƒ‰ƒ[ƒ^‰Šú‰»
         self.reset_state()
-        
 
     ####################################
-    #ç´¯ç©å€¤ã®åˆæœŸåŒ– (Game Over å¾Œ)
+    # —İÏ’l‚Ì‰Šú‰» (Game Over Œã)
     ####################################
+
     def reset_state(self):
-        ## å­¦ç¿’ã®å ´åˆ
-        if self.mode=="train" or self.mode=="train_sample" or self.mode=="train_sample2": 
-            ## æœ€é«˜ç‚¹,500 epoch ãŠãã«ä¿å­˜
+        # ŠwK‚Ìê‡
+        if self.mode == "train" or self.mode == "train_sample" or self.mode == "train_sample2":
+            # Å‚“_,500 epoch ‚¨‚«‚É•Û‘¶
             if self.score > self.max_score or self.epoch % 500 == 0:
-                torch.save(self.model, "{}/tetris_epoch{}_score{}.pt".format(self.weight_dir,self.epoch,self.score))
-                self.max_score  =  self.score
-                torch.save(self.model,self.best_weight)
-        # åˆæœŸåŒ–ã‚¹ãƒ†ãƒ¼ãƒˆ
+                torch.save(
+                    self.model, "{}/tetris_epoch{}_score{}.pt".format(self.weight_dir, self.epoch, self.score))
+                self.max_score = self.score
+                torch.save(self.model, self.best_weight)
+        # ‰Šú‰»ƒXƒe[ƒg
         self.state = self.initial_state
         self.score = 0
         self.cleared_lines = 0
-        self.cleared_col = [0,0,0,0,0]
+        self.cleared_col = [0, 0, 0, 0, 0]
         self.epoch_reward = 0
-        # ãƒ†ãƒˆãƒªãƒŸãƒ 0 å€‹
+        # ƒeƒgƒŠƒ~ƒm 0 ŒÂ
         self.tetrominoes = 0
-        # å‰ã®ã‚¿ãƒ¼ãƒ³ã§ Drop ã‚’ã‚¹ã‚­ãƒƒãƒ—ã—ã¦ã„ãŸã‹ï¼Ÿ (-1: ã—ã¦ã„ãªã„, ãã‚Œä»¥å¤–: ã—ã¦ã„ãŸ)
+        # ‘O‚Ìƒ^[ƒ“‚Å Drop ‚ğƒXƒLƒbƒv‚µ‚Ä‚¢‚½‚©H (-1: ‚µ‚Ä‚¢‚È‚¢, ‚»‚êˆÈŠO: ‚µ‚Ä‚¢‚½)
         # third_y, forth_direction, fifth_x
         self.skip_drop = [-1, -1, -1]
 
     ####################################
-    #å‰Šé™¤ã•ã‚Œã‚‹Lineã‚’æ•°ãˆã‚‹
+    # íœ‚³‚ê‚éLine‚ğ”‚¦‚é
     ####################################
     def check_cleared_rows(self, reshape_board):
         board_new = np.copy(reshape_board)
         lines = 0
         empty_line = np.array([0 for i in range(self.width)])
         for y in range(self.height - 1, -1, -1):
-            blockCount  = np.sum(reshape_board[y])
+            blockCount = np.sum(reshape_board[y])
             if blockCount == self.width:
                 lines += 1
-                board_new = np.delete(board_new,y,0)
-                board_new = np.vstack([empty_line,board_new ])
-        return lines,board_new
+                board_new = np.delete(board_new, y, 0)
+                board_new = np.vstack([empty_line, board_new])
+        return lines, board_new
 
     ####################################
-    ## ã§ã“ã¼ã“åº¦, é«˜ã•åˆè¨ˆ, é«˜ã•æœ€å¤§, é«˜ã•æœ€å°ã‚’æ±‚ã‚ã‚‹
+    # ‚Å‚±‚Ú‚±“x, ‚‚³‡Œv, ‚‚³Å‘å, ‚‚³Å¬‚ğ‹‚ß‚é
     ####################################
     def get_bumpiness_and_height(self, reshape_board):
-        # ãƒœãƒ¼ãƒ‰ä¸Šã§ 0 ã§ãªã„ã‚‚ã®(ãƒ†ãƒˆãƒªãƒŸãƒã®ã‚ã‚‹ã¨ã“ã‚)ã‚’æŠ½å‡º
-        # (0,1,2,3,4,5,6,7) ã‚’ ãƒ–ãƒ­ãƒƒã‚¯ã‚ã‚Š True, ãªã— False ã«å¤‰æ›´
+        # ƒ{[ƒhã‚Å 0 ‚Å‚È‚¢‚à‚Ì(ƒeƒgƒŠƒ~ƒm‚Ì‚ ‚é‚Æ‚±‚ë)‚ğ’Šo
+        # (0,1,2,3,4,5,6,7) ‚ğ ƒuƒƒbƒN‚ ‚è True, ‚È‚µ False ‚É•ÏX
         mask = reshape_board != 0
-        #pprint.pprint(mask, width = 61, compact = True)
+        # pprint.pprint(mask, width = 61, compact = True)
 
-        # åˆ—æ–¹å‘ ä½•ã‹ãƒ–ãƒ­ãƒƒã‚¯ãŒãŒã‚ã‚Œã°ã€ãã®indexã‚’è¿”ã™
-        # ãªã‘ã‚Œã°ç”»é¢ãƒœãƒ¼ãƒ‰ç¸¦ã‚µã‚¤ã‚ºã‚’è¿”ã™
-        # ä¸Šè¨˜ã‚’ ç”»é¢ãƒœãƒ¼ãƒ‰ã®åˆ—ã«å¯¾ã—ã¦å®Ÿæ–½ã—ãŸã®é…åˆ—(é•·ã• width)ã‚’è¿”ã™
-        invert_heights = np.where(mask.any(axis=0), np.argmax(mask, axis=0), self.height)
-        # ä¸Šã‹ã‚‰ã®è·é›¢ãªã®ã§åè»¢ (é…åˆ—)
+        # —ñ•ûŒü ‰½‚©ƒuƒƒbƒN‚ª‚ª‚ ‚ê‚ÎA‚»‚Ìindex‚ğ•Ô‚·
+        # ‚È‚¯‚ê‚Î‰æ–Êƒ{[ƒhcƒTƒCƒY‚ğ•Ô‚·
+        # ã‹L‚ğ ‰æ–Êƒ{[ƒh‚Ì—ñ‚É‘Î‚µ‚ÄÀ{‚µ‚½‚Ì”z—ñ(’·‚³ width)‚ğ•Ô‚·
+        invert_heights = np.where(
+            mask.any(axis=0), np.argmax(mask, axis=0), self.height)
+        # ã‚©‚ç‚Ì‹——£‚È‚Ì‚Å”½“] (”z—ñ)
         heights = self.height - invert_heights
-        # é«˜ã•ã®åˆè¨ˆã‚’ã¨ã‚‹ (è¿”ã‚Šå€¤ç”¨)
+        # ‚‚³‚Ì‡Œv‚ğ‚Æ‚é (•Ô‚è’l—p)
         total_height = np.sum(heights)
-        # æœ€ã‚‚é«˜ã„ã¨ã“ã‚ã‚’ã¨ã‚‹ (è¿”ã‚Šå€¤ç”¨)
+        # Å‚à‚‚¢‚Æ‚±‚ë‚ğ‚Æ‚é (•Ô‚è’l—p)
         max_height = np.max(heights)
-        # æœ€ã‚‚ä½ã„ã¨ã“ã‚ã‚’ã¨ã‚‹ (è¿”ã‚Šå€¤ç”¨)
+        # Å‚à’á‚¢‚Æ‚±‚ë‚ğ‚Æ‚é (•Ô‚è’l—p)
         min_height = np.min(heights)
 
-        # å³ç«¯åˆ—ã‚’å‰Šã£ãŸ é«˜ã•é…åˆ—
-        #currs = heights[:-1]
+        # ‰E’[—ñ‚ğí‚Á‚½ ‚‚³”z—ñ
+        # currs = heights[:-1]
         currs = heights[1:-1]
 
-        # å·¦ç«¯åˆ—2ã¤ã‚’å‰Šã£ãŸé«˜ã•é…åˆ—
-        #nexts = heights[1:]
+        # ¶’[—ñ2‚Â‚ğí‚Á‚½‚‚³”z—ñ
+        # nexts = heights[1:]
         nexts = heights[2:]
 
-        # å·®åˆ†ã®çµ¶å¯¾å€¤ã‚’ã¨ã‚Šé…åˆ—ã«ã™ã‚‹
+        # ·•ª‚Ìâ‘Î’l‚ğ‚Æ‚è”z—ñ‚É‚·‚é
         diffs = np.abs(currs - nexts)
-        # å·¦ç«¯åˆ—ã¯ self.bumpiness_left_side_relax æ®µå·®ã¾ã§è¨±å®¹
-        if heights[1] - heights[0] > self.bumpiness_left_side_relax or heights[1] - heights[0] < 0 :
+        # ¶’[—ñ‚Í self.bumpiness_left_side_relax ’i·‚Ü‚Å‹–—e
+        if heights[1] - heights[0] > self.bumpiness_left_side_relax or heights[1] - heights[0] < 0:
             diffs = np.append(abs(heights[1] - heights[0]), diffs)
 
-        # å·®åˆ†ã®çµ¶å¯¾å€¤ã‚’åˆè¨ˆã—ã¦ã§ã“ã¼ã“åº¦ã¨ã™ã‚‹
+        # ·•ª‚Ìâ‘Î’l‚ğ‡Œv‚µ‚Ä‚Å‚±‚Ú‚±“x‚Æ‚·‚é
         total_bumpiness = np.sum(diffs)
         return total_bumpiness, total_height, max_height, min_height, heights[0]
 
     ####################################
-    ## ç©´ã®æ•°, ç©´ã®ä¸Šç©ã¿ä¸Šã’ Penalty, æœ€ã‚‚é«˜ã„ç©´ã®ä½ç½®ã‚’æ±‚ã‚ã‚‹
-    # reshape_board: 2æ¬¡å…ƒç”»é¢ãƒœãƒ¼ãƒ‰
-    # min_height: åˆ°é”å¯èƒ½ã®æœ€ä¸‹å±¤ã‚ˆã‚Š1è¡Œä¸‹ã®ç©´ã®ä½ç½®ã‚’ãƒã‚§ãƒƒã‚¯ -1 ã§ç„¡åŠ¹ hole_top_penalty ç„¡åŠ¹
+    # ŒŠ‚Ì”, ŒŠ‚ÌãÏ‚İã‚° Penalty, Å‚à‚‚¢ŒŠ‚ÌˆÊ’u‚ğ‹‚ß‚é
+    # reshape_board: 2ŸŒ³‰æ–Êƒ{[ƒh
+    # min_height: “’B‰Â”\‚ÌÅ‰º‘w‚æ‚è1s‰º‚ÌŒŠ‚ÌˆÊ’u‚ğƒ`ƒFƒbƒN -1 ‚Å–³Œø hole_top_penalty –³Œø
     ####################################
     def get_holes(self, reshape_board, min_height):
-        # ç©´ã®æ•°
+        # ŒŠ‚Ì”
         num_holes = 0
-        # ç©´ã®ä¸Šã®ç©ã¿ä¸Šã’ãƒšãƒŠãƒ«ãƒ†ã‚£
+        # ŒŠ‚Ìã‚ÌÏ‚İã‚°ƒyƒiƒ‹ƒeƒB
         hole_top_penalty = 0
-        # åœ°é¢ã®é«˜ã• list
+        # ’n–Ê‚Ì‚‚³ list
         highest_grounds = [-1] * self.width
-        # æœ€ã‚‚é«˜ã„ç©´ã® list
+        # Å‚à‚‚¢ŒŠ‚Ì list
         highest_holes = [-1] * self.width
-        # åˆ—ã”ã¨ã«åˆ‡ã‚Šå‡ºã—
+        # —ñ‚²‚Æ‚ÉØ‚èo‚µ
         for i in range(self.width):
-            # åˆ—å–å¾—
-            col = reshape_board[:,i]
-            #print(col)
+            # —ñæ“¾
+            col = reshape_board[:, i]
+            # print(col)
             ground_level = 0
-            # ä¸Šã®è¡Œã‹ã‚‰ 0(ãƒ–ãƒ­ãƒƒã‚¯ãªã—) ã‚’ã¿ã¤ã‘ã¦ã„ã, ground_level ãŒä»Šã®åˆ—ã®æœ€ä¸Šå±¤
+            # ã‚Ìs‚©‚ç 0(ƒuƒƒbƒN‚È‚µ) ‚ğ‚İ‚Â‚¯‚Ä‚¢‚­, ground_level ‚ª¡‚Ì—ñ‚ÌÅã‘w
             while ground_level < self.height and col[ground_level] == 0:
                 ground_level += 1
-            # ãã®è¡Œä»¥é™ã®ç©´ã®list ã‚’ä½œã‚Š
+            # ‚»‚ÌsˆÈ~‚ÌŒŠ‚Ìlist ‚ğì‚è
             cols_holes = []
             for y, state in enumerate(col[ground_level + 1:]):
-                # ç©´ã®ã‚ã‚‹å ´æ‰€ã‚’listã«ã™ã‚‹, listå€¤ã¨ã—ã¦ç©´ã®ä½ç½®ã‚’ã„ã‚Œã‚‹
+                # ŒŠ‚Ì‚ ‚éêŠ‚ğlist‚É‚·‚é, list’l‚Æ‚µ‚ÄŒŠ‚ÌˆÊ’u‚ğ‚¢‚ê‚é
                 if state == 0:
-                    #num_holes += 1
+                    # num_holes += 1
                     cols_holes.append(self.height - (ground_level + 1 + y) - 1)
-            ## æ—§ 1 liner æ–¹å¼ã®ã‚«ã‚¦ãƒ³ãƒˆ
-            #cols_holes = [x for x in col[ground_level + 1:] if x == 0]
-            # list ã‚’ã‚«ã‚¦ãƒ³ãƒˆã—ã¦ç©´ã®æ•°ã‚’ã‚«ã‚¦ãƒ³ãƒˆ
+            # ‹Œ 1 liner •û®‚ÌƒJƒEƒ“ƒg
+            # cols_holes = [x for x in col[ground_level + 1:] if x == 0]
+            # list ‚ğƒJƒEƒ“ƒg‚µ‚ÄŒŠ‚Ì”‚ğƒJƒEƒ“ƒg
             num_holes += len(cols_holes)
 
-            # åœ°é¢ã®é«˜ã•é…åˆ—
+            # ’n–Ê‚Ì‚‚³”z—ñ
             highest_grounds[i] = self.height - ground_level - 1
 
-            # æœ€ã‚‚é«˜ã„ç©´ã®ä½ç½®é…åˆ—
+            # Å‚à‚‚¢ŒŠ‚ÌˆÊ’u”z—ñ
             if len(cols_holes) > 0:
                 highest_holes[i] = cols_holes[0]
             else:
                 highest_holes[i] = -1
 
-        ## æœ€ã‚‚é«˜ã„ç©´ã‚’æ±‚ã‚ã‚‹
+        # Å‚à‚‚¢ŒŠ‚ğ‹‚ß‚é
         max_highest_hole = max(highest_holes)
 
-        ## åˆ°é”å¯èƒ½ã®æœ€ä¸‹å±¤ã‚ˆã‚Š1è¡Œä¸‹ã®ç©´ã®ä½ç½®ã‚’ãƒã‚§ãƒƒã‚¯
+        # “’B‰Â”\‚ÌÅ‰º‘w‚æ‚è1s‰º‚ÌŒŠ‚ÌˆÊ’u‚ğƒ`ƒFƒbƒN
         if min_height > 0:
-            ## æœ€ã‚‚é«˜ã„ã¨ã“ã‚ã«ã‚ã‚‹ç©´ã®æ•°
+            # Å‚à‚‚¢‚Æ‚±‚ë‚É‚ ‚éŒŠ‚Ì”
             highest_hole_num = 0
-            ## åˆ—ã”ã¨ã«åˆ‡ã‚Šå‡ºã—
+            # —ñ‚²‚Æ‚ÉØ‚èo‚µ
             for i in range(self.width):
-                ## æœ€ã‚‚é«˜ã„ä½ç½®ã®ç©´ã®åˆ—ã®å ´åˆ
+                # Å‚à‚‚¢ˆÊ’u‚ÌŒŠ‚Ì—ñ‚Ìê‡
                 if highest_holes[i] == max_highest_hole:
                     highest_hole_num += 1
-                    ## ç©´ã®çµ¶å¯¾ä½ç½®ãŒhole_top_limit_heightã‚ˆã‚Šé«˜ã
-                    ## ç©´ã®ä¸Šã®åœ°é¢ãŒé«˜ã„ãªã‚‰ Penalty
+                    # ŒŠ‚Ìâ‘ÎˆÊ’u‚ªhole_top_limit_height‚æ‚è‚‚­
+                    # ŒŠ‚Ìã‚Ì’n–Ê‚ª‚‚¢‚È‚ç Penalty
                     if highest_holes[i] > self.hole_top_limit_height and \
-                           highest_grounds[i] >= highest_holes[i] + self.hole_top_limit:
-                        hole_top_penalty += highest_grounds[i] - (highest_holes[i])
-            ## æœ€ã‚‚é«˜ã„ä½ç½®ã«ã‚ã‚‹ç©´ã®æ•°ã§å‰²ã‚‹
+                            highest_grounds[i] >= highest_holes[i] + self.hole_top_limit:
+                        hole_top_penalty += highest_grounds[i] - \
+                            (highest_holes[i])
+            # Å‚à‚‚¢ˆÊ’u‚É‚ ‚éŒŠ‚Ì”‚ÅŠ„‚é
             hole_top_penalty /= highest_hole_num
             # debug
-            #print(['{:02}'.format(n) for n in highest_grounds])
-            #print(['{:02}'.format(n) for n in highest_holes])
-            #print(hole_top_penalty, hole_top_penalty*max_highest_hole)
-            #print("==")
+            # print(['{:02}'.format(n) for n in highest_grounds])
+            # print(['{:02}'.format(n) for n in highest_holes])
+            # print(hole_top_penalty, hole_top_penalty*max_highest_hole)
+            # print("==")
 
         return num_holes, hole_top_penalty, max_highest_hole
-    
+
     ####################################
-    # ç¾çŠ¶çŠ¶æ…‹ã®å„ç¨®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿å–å¾— (MLP
+    # Œ»óó‘Ô‚ÌŠeíƒpƒ‰ƒ[ƒ^æ“¾ (MLP
     ####################################
     def get_state_properties(self, reshape_board):
-        #å‰Šé™¤ã•ã‚ŒãŸè¡Œã®å ±é…¬
+        # íœ‚³‚ê‚½s‚Ì•ñV
         lines_cleared, reshape_board = self.check_cleared_rows(reshape_board)
-        # ç©´ã®æ•°
-        holes, _ , _ = self.get_holes(reshape_board, -1)
-        # ã§ã“ã¼ã“ã®æ•°
-        bumpiness, height, max_height, min_height, _ = self.get_bumpiness_and_height(reshape_board)
+        # ŒŠ‚Ì”
+        holes, _, _ = self.get_holes(reshape_board, -1)
+        # ‚Å‚±‚Ú‚±‚Ì”
+        bumpiness, height, max_height, min_height, _ = self.get_bumpiness_and_height(
+            reshape_board)
 
         return torch.FloatTensor([lines_cleared, holes, bumpiness, height])
 
     ####################################
-    # ç¾çŠ¶çŠ¶æ…‹ã®å„ç¨®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿å–å¾—ã€€é«˜ã•ä»˜ã ä»Šã¯ä½¿ã£ã¦ã„ãªã„
+    # Œ»óó‘Ô‚ÌŠeíƒpƒ‰ƒ[ƒ^æ“¾@‚‚³•t‚« ¡‚Íg‚Á‚Ä‚¢‚È‚¢
     ####################################
     def get_state_properties_v2(self, reshape_board):
-        # å‰Šé™¤ã•ã‚ŒãŸè¡Œã®å ±é…¬
+        # íœ‚³‚ê‚½s‚Ì•ñV
         lines_cleared, reshape_board = self.check_cleared_rows(reshape_board)
-        # ç©´ã®æ•°
-        holes, _ , _ = self.get_holes(reshape_board, -1)
-        # ã§ã“ã¼ã“ã®æ•°
-        bumpiness, height, max_row, min_height,_ = self.get_bumpiness_and_height(reshape_board)
-        # æœ€å¤§é«˜ã•
-        #max_row = self.get_max_height(reshape_board)
+        # ŒŠ‚Ì”
+        holes, _, _ = self.get_holes(reshape_board, -1)
+        # ‚Å‚±‚Ú‚±‚Ì”
+        bumpiness, height, max_row, min_height, _ = self.get_bumpiness_and_height(
+            reshape_board)
+        # Å‘å‚‚³
+        # max_row = self.get_max_height(reshape_board)
         return torch.FloatTensor([lines_cleared, holes, bumpiness, height, max_row])
 
     ####################################
-    # æœ€å¤§ã®é«˜ã•ã‚’å–å¾—
-    # get_bumpiness_and_height ã«ã¨ã‚Šã“ã¾ã‚ŒãŸã®ã§å»ƒæ­¢
+    # Å‘å‚Ì‚‚³‚ğæ“¾
+    # get_bumpiness_and_height ‚É‚Æ‚è‚±‚Ü‚ê‚½‚Ì‚Å”p~
     ####################################
     def get_max_height(self, reshape_board):
-        # X è»¸ã®ã‚»ãƒ«ã‚’è¶³ã—ç®—ã™ã‚‹
-        sum_ = np.sum(reshape_board,axis=1)
-        #print(sum_)
+        # X ²‚ÌƒZƒ‹‚ğ‘«‚µZ‚·‚é
+        sum_ = np.sum(reshape_board, axis=1)
+        # print(sum_)
         row = 0
-        # X è»¸ã®åˆè¨ˆãŒ0ã«ãªã‚‹ Y è»¸ã‚’æ¢ã™
-        while row < self.height and sum_[row] ==0:
+        # X ²‚Ì‡Œv‚ª0‚É‚È‚é Y ²‚ğ’T‚·
+        while row < self.height and sum_[row] == 0:
             row += 1
         return self.height - row
 
     ####################################
-    # å·¦ç«¯ä»¥å¤–åŸ‹ã¾ã£ã¦ã„ã‚‹ã‹ï¼Ÿ
+    # ¶’[ˆÈŠO–„‚Ü‚Á‚Ä‚¢‚é‚©H
     ####################################
     def get_tetris_fill_reward(self, reshape_board):
-        # ç„¡åŠ¹ã®å ´åˆ
+        # –³Œø‚Ìê‡
         if self.tetris_fill_height == 0:
             return 0
 
-        # å ±é…¬
+        # •ñV
         reward = 0
-        # ãƒœãƒ¼ãƒ‰ä¸Šã§ 0 ã§ãªã„ã‚‚ã®(ãƒ†ãƒˆãƒªãƒŸãƒã®ã‚ã‚‹ã¨ã“ã‚)ã‚’æŠ½å‡º
-        # (0,1,2,3,4,5,6,7) ã‚’ ãƒ–ãƒ­ãƒƒã‚¯ã‚ã‚Š True, ãªã— False ã«å¤‰æ›´
+        # ƒ{[ƒhã‚Å 0 ‚Å‚È‚¢‚à‚Ì(ƒeƒgƒŠƒ~ƒm‚Ì‚ ‚é‚Æ‚±‚ë)‚ğ’Šo
+        # (0,1,2,3,4,5,6,7) ‚ğ ƒuƒƒbƒN‚ ‚è True, ‚È‚µ False ‚É•ÏX
         mask = reshape_board != 0
-        # X è»¸ã®ã‚»ãƒ«ã‚’è¶³ã—ç®—ã™ã‚‹
+        # X ²‚ÌƒZƒ‹‚ğ‘«‚µZ‚·‚é
         sum_ = np.sum(mask, axis=1)
-        #print(sum_)
-        
-        # line (1 - self.tetris_fill_height)æ®µç›®ã®å·¦ç«¯ä»¥å¤–ãã‚ã£ã¦ã„ã‚‹ã‹
+        # print(sum_)
+
+        # line (1 - self.tetris_fill_height)’i–Ú‚Ì¶’[ˆÈŠO‚»‚ë‚Á‚Ä‚¢‚é‚©
         for i in range(1, self.tetris_fill_height):
-            # ãã‚ã£ã¦ã„ã‚‹æ®µã”ã¨ã«å ±é…¬
+            # ‚»‚ë‚Á‚Ä‚¢‚é’i‚²‚Æ‚É•ñV
             if self.get_line_right_fill(reshape_board, sum_, i):
-                reward +=1
-            ## 1æ®µç›®ã¯2å€
-            if i==1:
-                reward +=5
+                reward += 1
+            # 1’i–Ú‚Í2”{
+            if i == 1:
+                reward += 5
 
         return reward
 
     ####################################
-    # line æ®µç›®ãŒå·¦ç«¯ä»¥å¤–ãã‚ã£ã¦ã„ã‚‹ã‹
+    # line ’i–Ú‚ª¶’[ˆÈŠO‚»‚ë‚Á‚Ä‚¢‚é‚©
     ####################################
     def get_line_right_fill(self, reshape_board, sum_, line):
-        # 1æ®µç›®ãŒç«¯ä»¥å¤–ãã‚ã£ã¦ã„ã‚‹
-        if sum_[self.height - line] == self.width -1 \
-               and reshape_board[self.height - line][0] == 0 :
-            #or reshape_board[self.height-1][self.width-1] == 0 ):
-            #print("line:", line)
+        # 1’i–Ú‚ª’[ˆÈŠO‚»‚ë‚Á‚Ä‚¢‚é
+        if sum_[self.height - line] == self.width - 1 \
+                and reshape_board[self.height - line][0] == 0:
+            # or reshape_board[self.height-1][self.width-1] == 0 ):
+            # print("line:", line)
             return True
         else:
             return False
 
     ####################################
-    #æ¬¡ã®çŠ¶æ…‹ãƒªã‚¹ãƒˆã‚’å–å¾—(2æ¬¡å…ƒç”¨) DQN .... ç”»é¢ãƒœãƒ¼ãƒ‰ã§ ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢çŠ¶æ…‹ ã«è½ä¸‹ã•ã›ãŸã¨ãã®æ¬¡ã®çŠ¶æ…‹ä¸€è¦§ã‚’ä½œæˆ
-    #  get_next_func ã§ã‚ˆã³ã ã•ã‚Œã‚‹
-    # curr_backboard ç¾ç”»é¢
-    # piece_id ãƒ†ãƒˆãƒªãƒŸãƒ I L J T O S Z
+    # Ÿ‚Ìó‘ÔƒŠƒXƒg‚ğæ“¾(2ŸŒ³—p) DQN .... ‰æ–Êƒ{[ƒh‚Å ƒeƒgƒŠƒ~ƒm‰ñ“]ó‘Ô ‚É—‰º‚³‚¹‚½‚Æ‚«‚ÌŸ‚Ìó‘Ôˆê——‚ğì¬
+    #  get_next_func ‚Å‚æ‚Ñ‚¾‚³‚ê‚é
+    # curr_backboard Œ»‰æ–Ê
+    # piece_id ƒeƒgƒŠƒ~ƒm I L J T O S Z
     # currentshape_class = status["field_info"]["backboard"]
     ####################################
     def get_next_states_v2(self, curr_backboard, piece_id, CurrentShape_class):
-        # æ¬¡ã®çŠ¶æ…‹ä¸€è¦§
+        # Ÿ‚Ìó‘Ôˆê——
         states = {}
 
-        # ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢æ–¹å‘ã”ã¨ã®é…ç½®å¹…
+        # ƒeƒgƒŠƒ~ƒm‰ñ“]•ûŒü‚²‚Æ‚Ì”z’u•
         x_range_min = [0] * 4
         x_range_max = [self.width] * 4
 
-        # è¨­ç½®é«˜ã•ãƒªã‚¹ãƒˆ drop_y_list[(direction,x)] = height
+        # İ’u‚‚³ƒŠƒXƒg drop_y_list[(direction,x)] = height
         drop_y_list = {}
-        # æ¤œè¨¼æ¸ˆãƒªã‚¹ãƒˆ checked_board[(direction0, x0, drop_y)] =True
+        # ŒŸØÏƒŠƒXƒg checked_board[(direction0, x0, drop_y)] =True
         checked_board = {}
 
-        # ãƒ†ãƒˆãƒªãƒŸãƒã”ã¨ã«å›è»¢æ•°ã‚’ãµã‚Šã‚ã‘
+        # ƒeƒgƒŠƒ~ƒm‚²‚Æ‚É‰ñ“]”‚ğ‚Ó‚è‚í‚¯
         if piece_id == 5:  # O piece => 1
             num_rotations = 1
-        elif piece_id == 1 or piece_id == 6 or piece_id == 7: # I, S, Z piece => 2
+        elif piece_id == 1 or piece_id == 6 or piece_id == 7:  # I, S, Z piece => 2
             num_rotations = 2
-        else: # the others => 4
+        else:  # the others => 4
             num_rotations = 4
 
         ####################
-        ## Drop Down è½ä¸‹ ã®å ´åˆã®ä¸€è¦§ä½œæˆ
-        # ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢æ–¹å‘ã”ã¨ã«ä¸€è¦§è¿½åŠ 
+        # Drop Down —‰º ‚Ìê‡‚Ìˆê——ì¬
+        # ƒeƒgƒŠƒ~ƒm‰ñ“]•ûŒü‚²‚Æ‚Éˆê——’Ç‰Á
         for direction0 in range(num_rotations):
-            # ãƒ†ãƒˆãƒªãƒŸãƒãŒé…ç½®ã§ãã‚‹å·¦ç«¯ã¨å³ç«¯ã®åº§æ¨™ã‚’è¿”ã™
+            # ƒeƒgƒŠƒ~ƒm‚ª”z’u‚Å‚«‚é¶’[‚Æ‰E’[‚ÌÀ•W‚ğ•Ô‚·
             x0Min, x0Max = self.getSearchXRange(CurrentShape_class, direction0)
-            (x_range_min[direction0], x_range_max[direction0] )= (x0Min,x0Max)
+            (x_range_min[direction0], x_range_max[direction0]) = (x0Min, x0Max)
 
             for x0 in range(x0Min, x0Max):
                 # get board data, as if dropdown block
-                # ç”»é¢ãƒœãƒ¼ãƒ‰ãƒ‡ãƒ¼ã‚¿ã‚’ã‚³ãƒ”ãƒ¼ã—ã¦æŒ‡å®šåº§æ¨™ã«ãƒ†ãƒˆãƒªãƒŸãƒã‚’é…ç½®ã—è½ä¸‹ã•ã›ãŸç”»é¢ãƒœãƒ¼ãƒ‰ã¨yåº§æ¨™ã‚’è¿”ã™
-                board, drop_y = self.getBoard(curr_backboard, CurrentShape_class, direction0, x0, -1)
-                # å¾Œã®ãŸã‚ä¿å­˜
+                # ‰æ–Êƒ{[ƒhƒf[ƒ^‚ğƒRƒs[‚µ‚Äw’èÀ•W‚ÉƒeƒgƒŠƒ~ƒm‚ğ”z’u‚µ—‰º‚³‚¹‚½‰æ–Êƒ{[ƒh‚ÆyÀ•W‚ğ•Ô‚·
+                board, drop_y = self.getBoard(
+                    curr_backboard, CurrentShape_class, direction0, x0, -1)
+                # Œã‚Ì‚½‚ß•Û‘¶
                 drop_y_list[(direction0, x0)] = drop_y
                 checked_board[(direction0, x0, drop_y)] = True
 
-                # ãƒœãƒ¼ãƒ‰ã‚’ï¼’æ¬¡å…ƒåŒ–
+                # ƒ{[ƒh‚ğ‚QŸŒ³‰»
                 reshape_backboard = self.get_reshape_backboard(board)
-                # numpy to tensor (é…åˆ—ã‚’1æ¬¡å…ƒè¿½åŠ )
-                reshape_backboard = torch.from_numpy(reshape_backboard[np.newaxis,:,:]).float()
-                # ç”»é¢ãƒœãƒ¼ãƒ‰x0ã§ ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢çŠ¶æ…‹ direction0 ã«è½ä¸‹ã•ã›ãŸã¨ãã®æ¬¡ã®çŠ¶æ…‹ã‚’ä½œæˆ è¿½åŠ 
+                # numpy to tensor (”z—ñ‚ğ1ŸŒ³’Ç‰Á)
+                reshape_backboard = torch.from_numpy(
+                    reshape_backboard[np.newaxis, :, :]).float()
+                # ‰æ–Êƒ{[ƒhx0‚Å ƒeƒgƒŠƒ~ƒm‰ñ“]ó‘Ô direction0 ‚É—‰º‚³‚¹‚½‚Æ‚«‚ÌŸ‚Ìó‘Ô‚ğì¬ ’Ç‰Á
                 #  states
-                #    Key = Tuple (ãƒ†ãƒˆãƒªãƒŸãƒ Drop Down è½ä¸‹ æ™‚ç”»é¢ãƒœãƒ¼ãƒ‰Xåº§æ¨™, ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢çŠ¶æ…‹
-                #                 ãƒ†ãƒˆãƒªãƒŸãƒ Move Down é™ä¸‹ æ•°, ãƒ†ãƒˆãƒªãƒŸãƒè¿½åŠ ç§»å‹•Xåº§æ¨™, ãƒ†ãƒˆãƒªãƒŸãƒè¿½åŠ å›è»¢)
-                #                 ... -1 ã®å ´åˆ å‹•ä½œå¯¾è±¡å¤–
-                #    Value = ç”»é¢ãƒœãƒ¼ãƒ‰çŠ¶æ…‹
-                # (action ç”¨)
+                #    Key = Tuple (ƒeƒgƒŠƒ~ƒm Drop Down —‰º ‰æ–Êƒ{[ƒhXÀ•W, ƒeƒgƒŠƒ~ƒm‰ñ“]ó‘Ô
+                #                 ƒeƒgƒŠƒ~ƒm Move Down ~‰º ”, ƒeƒgƒŠƒ~ƒm’Ç‰ÁˆÚ“®XÀ•W, ƒeƒgƒŠƒ~ƒm’Ç‰Á‰ñ“])
+                #                 ... -1 ‚Ìê‡ “®ì‘ÎÛŠO
+                #    Value = ‰æ–Êƒ{[ƒhó‘Ô
+                # (action —p)
                 states[(x0, direction0, -1, -1, -1)] = reshape_backboard
 
-        #print(len(states), end='=>')
+        # print(len(states), end='=>')
 
-        ## Move Down é™ä¸‹ç„¡åŠ¹ã®å ´åˆ
+        # Move Down ~‰º–³Œø‚Ìê‡
         if self.move_down_flag == 0:
             return states
 
         ####################
-        ## Move Down é™ä¸‹ ã®å ´åˆã®ä¸€è¦§ä½œæˆ
-        # è¿½åŠ è£œæ­£ç§»å‹•
+        # Move Down ~‰º ‚Ìê‡‚Ìˆê——ì¬
+        # ’Ç‰Á•â³ˆÚ“®
         third_y = -1
         forth_direction = -1
         fifth_x = -1
         sixth_y = -1
 
-        # ãƒœãƒ¼ãƒ‰ã‚’ï¼’æ¬¡å…ƒåŒ–
+        # ƒ{[ƒh‚ğ‚QŸŒ³‰»
         reshape_curr_backboard = self.get_reshape_backboard(curr_backboard)
 
-        # ãƒœãƒ¼ãƒ‰ä¸Šã§ 0 ã§ãªã„ã‚‚ã®(ãƒ†ãƒˆãƒªãƒŸãƒã®ã‚ã‚‹ã¨ã“ã‚)ã‚’æŠ½å‡º
-        # (0,1,2,3,4,5,6,7) ã‚’ ãƒ–ãƒ­ãƒƒã‚¯ã‚ã‚Š True, ãªã— False ã«å¤‰æ›´
+        # ƒ{[ƒhã‚Å 0 ‚Å‚È‚¢‚à‚Ì(ƒeƒgƒŠƒ~ƒm‚Ì‚ ‚é‚Æ‚±‚ë)‚ğ’Šo
+        # (0,1,2,3,4,5,6,7) ‚ğ ƒuƒƒbƒN‚ ‚è True, ‚È‚µ False ‚É•ÏX
         mask_board = reshape_curr_backboard != 0
-        #pprint.pprint(mask_board, width = 61, compact = True)
+        # pprint.pprint(mask_board, width = 61, compact = True)
 
-        # åˆ—æ–¹å‘ ä½•ã‹ãƒ–ãƒ­ãƒƒã‚¯ãŒãŒã‚ã‚Œã°ã€ãã®indexã‚’è¿”ã™
-        # ãªã‘ã‚Œã°ç”»é¢ãƒœãƒ¼ãƒ‰ç¸¦ã‚µã‚¤ã‚ºã‚’è¿”ã™
-        # ä¸Šè¨˜ã‚’ ç”»é¢ãƒœãƒ¼ãƒ‰ã®åˆ—ã«å¯¾ã—ã¦å®Ÿæ–½ã—ãŸã®é…åˆ—(é•·ã• width)ã‚’è¿”ã™
-        invert_heights = np.where(mask_board.any(axis=0), np.argmax(mask_board, axis=0), self.height)
-        # ä¸Šã‹ã‚‰ã®è·é›¢ãªã®ã§åè»¢ (é…åˆ—)
+        # —ñ•ûŒü ‰½‚©ƒuƒƒbƒN‚ª‚ª‚ ‚ê‚ÎA‚»‚Ìindex‚ğ•Ô‚·
+        # ‚È‚¯‚ê‚Î‰æ–Êƒ{[ƒhcƒTƒCƒY‚ğ•Ô‚·
+        # ã‹L‚ğ ‰æ–Êƒ{[ƒh‚Ì—ñ‚É‘Î‚µ‚ÄÀ{‚µ‚½‚Ì”z—ñ(’·‚³ width)‚ğ•Ô‚·
+        invert_heights = np.where(mask_board.any(
+            axis=0), np.argmax(mask_board, axis=0), self.height)
+        # ã‚©‚ç‚Ì‹——£‚È‚Ì‚Å”½“] (”z—ñ)
         heights = self.height - invert_heights
-        ## æœ€å¤§é«˜ã•
-        #max_height = heights[np.argmax(heights)]
+        # Å‘å‚‚³
+        # max_height = heights[np.argmax(heights)]
         invert_max_height = invert_heights[np.argmin(invert_heights)]
 
         # Debug
-        if self.debug_flag_shift_rotation_success == 1 :
+        if self.debug_flag_shift_rotation_success == 1:
             print("")
-        if self.debug_flag_shift_rotation == 1 or self.debug_flag_shift_rotation_success == 1 :
+        if self.debug_flag_shift_rotation == 1 or self.debug_flag_shift_rotation_success == 1:
             print("==================================================")
-            print (heights)
-            print (invert_heights)
-            print("first_direction:", num_rotations, " | ", CurrentShape_class.shape)
+            print(heights)
+            print(invert_heights)
+            print("first_direction:", num_rotations,
+                  " | ", CurrentShape_class.shape)
 
-        ######## 1 å›ç›®ã® å›è»¢
+        # 1 ‰ñ–Ú‚Ì ‰ñ“]
         for first_direction in range(num_rotations):
             if self.debug_flag_shift_rotation == 1:
-                print(" 1d", first_direction,"/ second_x:",x_range_min[first_direction], " to ", x_range_max[first_direction])
-            ######## 2 å›ç›®ã® x è»¸ç§»å‹•
+                print(" 1d", first_direction, "/ second_x:",
+                      x_range_min[first_direction], " to ", x_range_max[first_direction])
+            # 2 ‰ñ–Ú‚Ì x ²ˆÚ“®
             for second_x in range(x_range_min[first_direction], x_range_max[first_direction]):
-                # é«˜ã•ãŒæœ€å¤§ã®é«˜ã•-1ã‚ˆã‚Šå¤§ãã„å ´åˆè¦‹è¾¼ã¿ãŒãªã„ã®ã§æ¬¡ã¸
+                # ‚‚³‚ªÅ‘å‚Ì‚‚³-1‚æ‚è‘å‚«‚¢ê‡Œ©‚İ‚ª‚È‚¢‚Ì‚ÅŸ‚Ö
                 if drop_y_list[(first_direction, second_x)] < invert_max_height + 1:
                     continue
-                # é«˜ã•ãŒ ç”»é¢æœ€å¤§-2ã‚ˆã‚Šå¤§ãã„å ´åˆã‚‚è¦‹è¾¼ã¿ãŒãªã„ã®ã§æ¬¡ã¸
+                # ‚‚³‚ª ‰æ–ÊÅ‘å-2‚æ‚è‘å‚«‚¢ê‡‚àŒ©‚İ‚ª‚È‚¢‚Ì‚ÅŸ‚Ö
                 if invert_heights[second_x] < 2:
                     continue
-                # y åº§æ¨™ã®ä¸‹é™ã¨ ãƒ–ãƒ­ãƒƒã‚¯æœ€å¤§ã®é«˜ã•-1 ã§æ¤œç´¢
+                # y À•W‚Ì‰ºŒÀ‚Æ ƒuƒƒbƒNÅ‘å‚Ì‚‚³-1 ‚ÅŒŸõ
                 if self.debug_flag_shift_rotation == 1:
-                    print("   2x", second_x, "/ third_y: ",invert_max_height, " to ", drop_y_list[(first_direction, second_x)]+1)
+                    print("   2x", second_x, "/ third_y: ", invert_max_height,
+                          " to ", drop_y_list[(first_direction, second_x)]+1)
 
-                ######## 3 å›ç›®ã® y è»¸é™ä¸‹
-                for third_y in range(invert_max_height , drop_y_list[(first_direction, second_x)]+1):
-                    # y åº§æ¨™ã®ä¸‹é™ã¨ ãƒ–ãƒ­ãƒƒã‚¯æœ€å¤§ã®é«˜ã•-1 ã§æ¤œç´¢
+                # 3 ‰ñ–Ú‚Ì y ²~‰º
+                for third_y in range(invert_max_height, drop_y_list[(first_direction, second_x)]+1):
+                    # y À•W‚Ì‰ºŒÀ‚Æ ƒuƒƒbƒNÅ‘å‚Ì‚‚³-1 ‚ÅŒŸõ
                     if self.debug_flag_shift_rotation == 1:
                         print("    3y", third_y, "/ forth_direction: ")
 
-                    # å³å›è»¢å›ºå®šãªã®ã§é †åºã‚’å¤‰ãˆã‚‹
+                    # ‰E‰ñ“]ŒÅ’è‚È‚Ì‚Å‡˜‚ğ•Ï‚¦‚é
                     direction_order = [0] * num_rotations
-                    # æœ€åˆã¯ first_direction
+                    # Å‰‚Í first_direction
                     new_direction_order = first_direction
-                    # 
+                    #
                     for order_num in range(num_rotations):
                         direction_order[order_num] = new_direction_order
                         new_direction_order += 1
                         if not (new_direction_order < num_rotations):
                             new_direction_order = 0
 
-                    #print(first_direction,"::", direction_order)
+                    # print(first_direction,"::", direction_order)
 
-                    ######## 4 å›ç›®ã® å›è»¢ (Turn 2)
-                    # first_direction ã‹ã‚‰å³å›è»¢ã—ã¦ã„ã
+                    # 4 ‰ñ–Ú‚Ì ‰ñ“] (Turn 2)
+                    # first_direction ‚©‚ç‰E‰ñ“]‚µ‚Ä‚¢‚­
                     for forth_direction in direction_order:
-                        # y åº§æ¨™ã®ä¸‹é™ã¨ ãƒ–ãƒ­ãƒƒã‚¯æœ€å¤§ã®é«˜ã•-1 ã§æ¤œç´¢
+                        # y À•W‚Ì‰ºŒÀ‚Æ ƒuƒƒbƒNÅ‘å‚Ì‚‚³-1 ‚ÅŒŸõ
                         if self.debug_flag_shift_rotation == 1:
-                            print("     4d", forth_direction, "/ fifth_x: ",0, " to ", x_range_max[forth_direction] - second_x, end='')
+                            print("     4d", forth_direction, "/ fifth_x: ", 0,
+                                  " to ", x_range_max[forth_direction] - second_x, end='')
                             print("//")
                             print("       R:", end='')
-                        # 0 ã‹ã‚‰æ¢ç´¢
+                        # 0 ‚©‚ç’Tõ
                         start_point_x = 0
-                        # æœ€åˆã¨åŒã˜å›è»¢çŠ¶æ…‹ãªã‚‰ãšã‚‰ã—ãŸã¨ã“ã‚ã‹ã‚‰æ¢ç´¢
+                        # Å‰‚Æ“¯‚¶‰ñ“]ó‘Ô‚È‚ç‚¸‚ç‚µ‚½‚Æ‚±‚ë‚©‚ç’Tõ
                         if first_direction == forth_direction:
                             start_point_x = 1
 
-                        # å³å›è»¢åˆ¤å®šãƒ•ãƒ©ã‚°
+                        # ‰E‰ñ“]”»’èƒtƒ‰ƒO
                         right_rotate = True
-                        
-                        ######## 5 å›ç›®ã® x è»¸ç§»å‹• (Turn 2)
-                        # shift_x åˆ†å³ã«ãšã‚‰ã—ã¦ç¢ºèª
+
+                        # 5 ‰ñ–Ú‚Ì x ²ˆÚ“® (Turn 2)
+                        # shift_x •ª‰E‚É‚¸‚ç‚µ‚ÄŠm”F
                         for shift_x in range(start_point_x, x_range_max[forth_direction] - second_x):
                             fifth_x = second_x + shift_x
-                            # ãšã‚‰ã—ãŸå…ˆã®æ–¹ãŒç©´ãŒæ·±ã„å ´åˆã¯æ¢ç´¢ä¸­æ­¢
-                            if not((forth_direction, fifth_x) in drop_y_list):
+                            # ‚¸‚ç‚µ‚½æ‚Ì•û‚ªŒŠ‚ª[‚¢ê‡‚Í’Tõ’†~
+                            if not ((forth_direction, fifth_x) in drop_y_list):
                                 if self.debug_flag_shift_rotation == 1:
                                     print(shift_x, ": False(OutRange) ", end='/ ')
-                                break;
+                                break
                             if third_y <= drop_y_list[(forth_direction, second_x + shift_x)]:
                                 if self.debug_flag_shift_rotation == 1:
                                     print(shift_x, ": False(drop) ", end='/ ')
-                                break;
-                            # direction (å›è»¢çŠ¶æ…‹)ã®ãƒ†ãƒˆãƒªãƒŸãƒ2æ¬¡å…ƒåº§æ¨™é…åˆ—ã‚’å–å¾—ã—ã€ãã‚Œã‚’x,yã«é…ç½®ã—ãŸå ´åˆã®åº§æ¨™é…åˆ—ã‚’è¿”ã™
-                            coordArray = self.getShapeCoordArray(CurrentShape_class, forth_direction, fifth_x, third_y)
-                            # xåº§æ¨™æ–¹å‘ã«ãƒ†ãƒˆãƒªãƒŸãƒãŒå‹•ã‹ã›ã‚‹ã‹ç¢ºèªã™ã‚‹
+                                break
+                            # direction (‰ñ“]ó‘Ô)‚ÌƒeƒgƒŠƒ~ƒm2ŸŒ³À•W”z—ñ‚ğæ“¾‚µA‚»‚ê‚ğx,y‚É”z’u‚µ‚½ê‡‚ÌÀ•W”z—ñ‚ğ•Ô‚·
+                            coordArray = self.getShapeCoordArray(
+                                CurrentShape_class, forth_direction, fifth_x, third_y)
+                            # xÀ•W•ûŒü‚ÉƒeƒgƒŠƒ~ƒm‚ª“®‚©‚¹‚é‚©Šm”F‚·‚é
                             judge = self.try_move_(curr_backboard, coordArray)
                             if self.debug_flag_shift_rotation == 1:
                                 print(shift_x, ":", judge, end='/')
-                            # å³ç§»å‹•å¯èƒ½
+                            # ‰EˆÚ“®‰Â”\
                             if judge:
                                 ####
-                                ## ç™»éŒ²æ¸ˆã‹ç¢ºèªã—ã€STATES ã¸å…¥ã‚Œã‚‹
+                                # “o˜^Ï‚©Šm”F‚µASTATES ‚Ö“ü‚ê‚é
                                 states, checked_board = \
-                                    self.second_drop_down(curr_backboard, CurrentShape_class, \
-                                                          first_direction, second_x, third_y, forth_direction, fifth_x, \
+                                    self.second_drop_down(curr_backboard, CurrentShape_class,
+                                                          first_direction, second_x, third_y, forth_direction, fifth_x,
                                                           states, checked_board)
-                            # å³ç§»å‹•ä¸å¯ãªã‚‰çµ‚äº†
+                            # ‰EˆÚ“®•s‰Â‚È‚çI—¹
                             else:
-                                ## æœ€åˆã®ä½ç½®ã§å³å›è»¢ãŒã†ã¾ãè¡Œã‹ãªã„å ´åˆã¯å›è»¢ä½œæ¥­ã‚‚æŠœã‘ã‚‹
+                                # Å‰‚ÌˆÊ’u‚Å‰E‰ñ“]‚ª‚¤‚Ü‚­s‚©‚È‚¢ê‡‚Í‰ñ“]ì‹Æ‚à”²‚¯‚é
                                 if shift_x == 0 and judge == False:
                                     right_rotate = False
-                                break;
+                                break
 
-                        ## æœ€åˆã®ä½ç½®ã§å³å›è»¢ãŒã†ã¾ãè¡Œã‹ãªã„å ´åˆã¯æŠœã‘ã‚‹
+                        # Å‰‚ÌˆÊ’u‚Å‰E‰ñ“]‚ª‚¤‚Ü‚­s‚©‚È‚¢ê‡‚Í”²‚¯‚é
                         if right_rotate == False:
                             if self.debug_flag_shift_rotation_success == 1:
-                                print(" |||", CurrentShape_class.shape, "-", forth_direction,\
+                                print(" |||", CurrentShape_class.shape, "-", forth_direction,
                                       "(", second_x, ",", third_y, ")|||<=RotateStop|||")
-                            break;
+                            break
 
-                        ## å³ãšã‚‰ã—çµ‚äº†
+                        # ‰E‚¸‚ç‚µI—¹
                         if self.debug_flag_shift_rotation == 1:
                             print("//")
                             print("       L:", end='')
 
                         ########
-                        # shift_x ã‚’å·¦ã«ãšã‚‰ã—ã¦ç¢ºèª
+                        # shift_x ‚ğ¶‚É‚¸‚ç‚µ‚ÄŠm”F
                         for shift_x in range(-1, -second_x - 1, -1):
                             fifth_x = second_x + shift_x
-                            # ãšã‚‰ã—ãŸå…ˆã®æ–¹ãŒç©´ãŒæ·±ã„å ´åˆã¯æ¢ç´¢ä¸­æ­¢
-                            if not((forth_direction, fifth_x) in drop_y_list):
-                                break;
+                            # ‚¸‚ç‚µ‚½æ‚Ì•û‚ªŒŠ‚ª[‚¢ê‡‚Í’Tõ’†~
+                            if not ((forth_direction, fifth_x) in drop_y_list):
+                                break
                             if third_y <= drop_y_list[(forth_direction, fifth_x)]:
-                                break;
-                            # direction (å›è»¢çŠ¶æ…‹)ã®ãƒ†ãƒˆãƒªãƒŸãƒ2æ¬¡å…ƒåº§æ¨™é…åˆ—ã‚’å–å¾—ã—ã€ãã‚Œã‚’x,yã«é…ç½®ã—ãŸå ´åˆã®åº§æ¨™é…åˆ—ã‚’è¿”ã™
-                            coordArray = self.getShapeCoordArray(CurrentShape_class, forth_direction, fifth_x, third_y)
-                            # xåº§æ¨™æ–¹å‘ã«ãƒ†ãƒˆãƒªãƒŸãƒãŒå‹•ã‹ã›ã‚‹ã‹ç¢ºèªã™ã‚‹
+                                break
+                            # direction (‰ñ“]ó‘Ô)‚ÌƒeƒgƒŠƒ~ƒm2ŸŒ³À•W”z—ñ‚ğæ“¾‚µA‚»‚ê‚ğx,y‚É”z’u‚µ‚½ê‡‚ÌÀ•W”z—ñ‚ğ•Ô‚·
+                            coordArray = self.getShapeCoordArray(
+                                CurrentShape_class, forth_direction, fifth_x, third_y)
+                            # xÀ•W•ûŒü‚ÉƒeƒgƒŠƒ~ƒm‚ª“®‚©‚¹‚é‚©Šm”F‚·‚é
                             judge = self.try_move_(curr_backboard, coordArray)
 
                             if self.debug_flag_shift_rotation == 1:
                                 print(shift_x, ":", judge, end='/ ')
 
-                            # å·¦ç§»å‹•å¯èƒ½
+                            # ¶ˆÚ“®‰Â”\
                             if judge:
                                 ####
-                                ## ç™»éŒ²æ¸ˆã‹ç¢ºèªã—ã€STATES ã¸å…¥ã‚Œã‚‹
+                                # “o˜^Ï‚©Šm”F‚µASTATES ‚Ö“ü‚ê‚é
                                 states, checked_board = \
-                                    self.second_drop_down(curr_backboard, CurrentShape_class, \
-                                                          first_direction, second_x, third_y, forth_direction, fifth_x, \
+                                    self.second_drop_down(curr_backboard, CurrentShape_class,
+                                                          first_direction, second_x, third_y, forth_direction, fifth_x,
                                                           states, checked_board)
 
-                            # å·¦ç§»å‹•ä¸å¯ãªã‚‰çµ‚äº†
+                            # ¶ˆÚ“®•s‰Â‚È‚çI—¹
                             else:
-                                break;
-                        ## å·¦ãšã‚‰ã—çµ‚äº†
+                                break
+                        # ¶‚¸‚ç‚µI—¹
                         if self.debug_flag_shift_rotation == 1:
                             print("//")
-                        #end shift_x
-                    #end forth
-                #end third
-            #end second
-        #end first
+                        # end shift_x
+                    # end forth
+                # end third
+            # end second
+        # end first
 
         # Debug
-        if self.debug_flag_shift_rotation_success == 1 :
+        if self.debug_flag_shift_rotation_success == 1:
             print("")
-        #print (len(states))
-        ## states (action) ã‚’è¿”ã™
+        # print (len(states))
+        # states (action) ‚ğ•Ô‚·
         return states
 
+    ####################################
+    # Ÿ‚Ìó‘Ô‚ğæ“¾(1ŸŒ³—p) MLP  .... ‰æ–Êƒ{[ƒh‚Å ƒeƒgƒŠƒ~ƒm‰ñ“]ó‘Ô ‚É—‰º‚³‚¹‚½‚Æ‚«‚ÌŸ‚Ìó‘Ôˆê——‚ğì¬
+    #  get_next_func ‚Å‚æ‚Ñ‚¾‚³‚ê‚é
+    ####################################
 
-    ####################################
-    #æ¬¡ã®çŠ¶æ…‹ã‚’å–å¾—(1æ¬¡å…ƒç”¨) MLP  .... ç”»é¢ãƒœãƒ¼ãƒ‰ã§ ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢çŠ¶æ…‹ ã«è½ä¸‹ã•ã›ãŸã¨ãã®æ¬¡ã®çŠ¶æ…‹ä¸€è¦§ã‚’ä½œæˆ
-    #  get_next_func ã§ã‚ˆã³ã ã•ã‚Œã‚‹
-    ####################################
     def get_next_states(self, curr_backboard, piece_id, CurrentShape_class):
-        # æ¬¡ã®çŠ¶æ…‹ä¸€è¦§
+        # Ÿ‚Ìó‘Ôˆê——
         states = {}
 
         if piece_id == 5:  # O piece
@@ -1196,209 +1237,226 @@ class Block_Controller(object):
             num_rotations = 4
 
         ####################
-        ## Drop Down è½ä¸‹ ã®å ´åˆã®ä¸€è¦§ä½œæˆ
-        # ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢æ–¹å‘ã”ã¨ã«ä¸€è¦§è¿½åŠ 
+        # Drop Down —‰º ‚Ìê‡‚Ìˆê——ì¬
+        # ƒeƒgƒŠƒ~ƒm‰ñ“]•ûŒü‚²‚Æ‚Éˆê——’Ç‰Á
         for direction0 in range(num_rotations):
-            # ãƒ†ãƒˆãƒªãƒŸãƒãŒé…ç½®ã§ãã‚‹å·¦ç«¯ã¨å³ç«¯ã®åº§æ¨™ã‚’è¿”ã™
+            # ƒeƒgƒŠƒ~ƒm‚ª”z’u‚Å‚«‚é¶’[‚Æ‰E’[‚ÌÀ•W‚ğ•Ô‚·
             x0Min, x0Max = self.getSearchXRange(CurrentShape_class, direction0)
-            # ãƒ†ãƒˆãƒªãƒŸãƒå·¦ç«¯ã‹ã‚‰å³ç«¯ã¾ã§é…ç½®
+            # ƒeƒgƒŠƒ~ƒm¶’[‚©‚ç‰E’[‚Ü‚Å”z’u
             for x0 in range(x0Min, x0Max):
                 # get board data, as if dropdown block
-                # ç”»é¢ãƒœãƒ¼ãƒ‰ãƒ‡ãƒ¼ã‚¿ã‚’ã‚³ãƒ”ãƒ¼ã—ã¦æŒ‡å®šåº§æ¨™ã«ãƒ†ãƒˆãƒªãƒŸãƒã‚’é…ç½®ã—è½ä¸‹ã•ã›ãŸç”»é¢ãƒœãƒ¼ãƒ‰ã¨yåº§æ¨™ã‚’è¿”ã™
-                board, drop_y = self.getBoard(curr_backboard, CurrentShape_class, direction0, x0, -1)
-                #ãƒœãƒ¼ãƒ‰ã‚’ï¼’æ¬¡å…ƒåŒ–
+                # ‰æ–Êƒ{[ƒhƒf[ƒ^‚ğƒRƒs[‚µ‚Äw’èÀ•W‚ÉƒeƒgƒŠƒ~ƒm‚ğ”z’u‚µ—‰º‚³‚¹‚½‰æ–Êƒ{[ƒh‚ÆyÀ•W‚ğ•Ô‚·
+                board, drop_y = self.getBoard(
+                    curr_backboard, CurrentShape_class, direction0, x0, -1)
+                # ƒ{[ƒh‚ğ‚QŸŒ³‰»
                 reshape_board = self.get_reshape_backboard(board)
-                # ç”»é¢ãƒœãƒ¼ãƒ‰x0ã§ ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢çŠ¶æ…‹ direction0 ã«è½ä¸‹ã•ã›ãŸã¨ãã®æ¬¡ã®çŠ¶æ…‹ã‚’ä½œæˆ
+                # ‰æ–Êƒ{[ƒhx0‚Å ƒeƒgƒŠƒ~ƒm‰ñ“]ó‘Ô direction0 ‚É—‰º‚³‚¹‚½‚Æ‚«‚ÌŸ‚Ìó‘Ô‚ğì¬
                 #  states
-                #    Key = Tuple (ãƒ†ãƒˆãƒªãƒŸãƒ Drop Down è½ä¸‹ æ™‚ç”»é¢ãƒœãƒ¼ãƒ‰Xåº§æ¨™, ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢çŠ¶æ…‹
-                #                 ãƒ†ãƒˆãƒªãƒŸãƒ Move Down é™ä¸‹ æ•°, ãƒ†ãƒˆãƒªãƒŸãƒè¿½åŠ ç§»å‹•Xåº§æ¨™, ãƒ†ãƒˆãƒªãƒŸãƒè¿½åŠ å›è»¢)
-                #    Value = ç”»é¢ãƒœãƒ¼ãƒ‰çŠ¶æ…‹
-                states[(x0, direction0, 0, 0, 0)] = self.get_state_properties(reshape_board)
+                #    Key = Tuple (ƒeƒgƒŠƒ~ƒm Drop Down —‰º ‰æ–Êƒ{[ƒhXÀ•W, ƒeƒgƒŠƒ~ƒm‰ñ“]ó‘Ô
+                #                 ƒeƒgƒŠƒ~ƒm Move Down ~‰º ”, ƒeƒgƒŠƒ~ƒm’Ç‰ÁˆÚ“®XÀ•W, ƒeƒgƒŠƒ~ƒm’Ç‰Á‰ñ“])
+                #    Value = ‰æ–Êƒ{[ƒhó‘Ô
+                states[(x0, direction0, 0, 0, 0)
+                       ] = self.get_state_properties(reshape_board)
 
         return states
 
     ####################################
-    # ãƒ†ãƒˆãƒªãƒŸãƒé…ç½®ã—ã¦ states ã«ç™»éŒ²ã™ã‚‹ (ãšã‚‰ã—æ™‚ç”¨)
+    # ƒeƒgƒŠƒ~ƒm”z’u‚µ‚Ä states ‚É“o˜^‚·‚é (‚¸‚ç‚µ—p)
     ####################################
-    def second_drop_down(self, curr_backboard, CurrentShape_class, \
+    def second_drop_down(self, curr_backboard, CurrentShape_class,
                          first_direction, second_x, third_y, forth_direction, fifth_x, states, checked_board):
-        ##debug
-        #self.debug_flag_drop_down = 1
+        # debug
+        # self.debug_flag_drop_down = 1
 
-        # ç”»é¢ãƒœãƒ¼ãƒ‰ãƒ‡ãƒ¼ã‚¿ã‚’ã‚³ãƒ”ãƒ¼ã—ã¦æŒ‡å®šåº§æ¨™ã«ãƒ†ãƒˆãƒªãƒŸãƒã‚’é…ç½®ã—è½ä¸‹ã•ã›ãŸç”»é¢ãƒœãƒ¼ãƒ‰ã¨yåº§æ¨™ã‚’è¿”ã™
-        new_board, drop_y = self.getBoard(curr_backboard, CurrentShape_class, forth_direction, fifth_x, third_y)
-        # è½ä¸‹æŒ‡å®š
+        # ‰æ–Êƒ{[ƒhƒf[ƒ^‚ğƒRƒs[‚µ‚Äw’èÀ•W‚ÉƒeƒgƒŠƒ~ƒm‚ğ”z’u‚µ—‰º‚³‚¹‚½‰æ–Êƒ{[ƒh‚ÆyÀ•W‚ğ•Ô‚·
+        new_board, drop_y = self.getBoard(
+            curr_backboard, CurrentShape_class, forth_direction, fifth_x, third_y)
+        # —‰ºw’è
         sixth_y = third_y + drop_y
 
-        #debug
+        # debug
         if self.debug_flag_shift_rotation_success == 1:
-            print(" ***", CurrentShape_class.shape, "-", forth_direction,\
-                  "(", fifth_x, ",", third_y,"=>", sixth_y, ")***", end='')
+            print(" ***", CurrentShape_class.shape, "-", forth_direction,
+                  "(", fifth_x, ",", third_y, "=>", sixth_y, ")***", end='')
 
-        # ç™»éŒ²æ¸ˆã§ãªã„ã‹ç¢ºèª
+        # “o˜^Ï‚Å‚È‚¢‚©Šm”F
         if not ((forth_direction, fifth_x, sixth_y) in checked_board):
-            #debug
+            # debug
             if self.debug_flag_shift_rotation_success == 1:
                 print("<=NEW***", end='')
-            # é™ä¸‹å¾Œå‹•ä½œã¨ã—ã¦ç™»éŒ² (é‡è¤‡é˜²æ­¢)
+            # ~‰ºŒã“®ì‚Æ‚µ‚Ä“o˜^ (d•¡–h~)
             checked_board[(forth_direction, fifth_x, sixth_y)] = True
-            # ãƒœãƒ¼ãƒ‰ã‚’ï¼’æ¬¡å…ƒåŒ–
+            # ƒ{[ƒh‚ğ‚QŸŒ³‰»
             reshape_backboard = self.get_reshape_backboard(new_board)
-            # numpy to tensor (é…åˆ—ã‚’1æ¬¡å…ƒè¿½åŠ )
-            reshape_backboard = torch.from_numpy(reshape_backboard[np.newaxis,:,:]).float()
+            # numpy to tensor (”z—ñ‚ğ1ŸŒ³’Ç‰Á)
+            reshape_backboard = torch.from_numpy(
+                reshape_backboard[np.newaxis, :, :]).float()
             ####################
-            # ç”»é¢ãƒœãƒ¼ãƒ‰x0ã§ ãƒ†ãƒˆãƒªãƒŸãƒç§»å‹•ã—ãŸæ™‚æ¬¡ã®ã®çŠ¶æ…‹ã‚’ä½œæˆ è¿½åŠ 
+            # ‰æ–Êƒ{[ƒhx0‚Å ƒeƒgƒŠƒ~ƒmˆÚ“®‚µ‚½Ÿ‚Ì‚Ìó‘Ô‚ğì¬ ’Ç‰Á
             #  states
-            #    Key = Tuple (ãƒ†ãƒˆãƒªãƒŸãƒ Drop Down è½ä¸‹ æ™‚ç”»é¢ãƒœãƒ¼ãƒ‰Xåº§æ¨™, ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢çŠ¶æ…‹
-            #                 ãƒ†ãƒˆãƒªãƒŸãƒ Move Down é™ä¸‹ æ•°, ãƒ†ãƒˆãƒªãƒŸãƒè¿½åŠ ç§»å‹•Xåº§æ¨™, ãƒ†ãƒˆãƒªãƒŸãƒè¿½åŠ å›è»¢)
-            #                 ... -1 ã®å ´åˆ å‹•ä½œå¯¾è±¡å¤–
-            #    Value = ç”»é¢ãƒœãƒ¼ãƒ‰çŠ¶æ…‹
-            # (action ç”¨)
-            states[(second_x, first_direction, third_y, forth_direction, fifth_x)] = reshape_backboard
+            #    Key = Tuple (ƒeƒgƒŠƒ~ƒm Drop Down —‰º ‰æ–Êƒ{[ƒhXÀ•W, ƒeƒgƒŠƒ~ƒm‰ñ“]ó‘Ô
+            #                 ƒeƒgƒŠƒ~ƒm Move Down ~‰º ”, ƒeƒgƒŠƒ~ƒm’Ç‰ÁˆÚ“®XÀ•W, ƒeƒgƒŠƒ~ƒm’Ç‰Á‰ñ“])
+            #                 ... -1 ‚Ìê‡ “®ì‘ÎÛŠO
+            #    Value = ‰æ–Êƒ{[ƒhó‘Ô
+            # (action —p)
+            states[(second_x, first_direction, third_y,
+                    forth_direction, fifth_x)] = reshape_backboard
 
-
-        #debug
+        # debug
         if self.debug_flag_shift_rotation_success == 1:
             print("")
 
         return states, checked_board
 
     ####################################
-    # é…ç½®ã§ãã‚‹ã‹ç¢ºèªã™ã‚‹
-    # board: 1æ¬¡å…ƒåº§æ¨™
-    # coordArray: ãƒ†ãƒˆãƒªãƒŸãƒ2æ¬¡å…ƒåº§æ¨™
+    # ”z’u‚Å‚«‚é‚©Šm”F‚·‚é
+    # board: 1ŸŒ³À•W
+    # coordArray: ƒeƒgƒŠƒ~ƒm2ŸŒ³À•W
     ####################################
     def try_move_(self, board, coordArray):
-        # ãƒ†ãƒˆãƒªãƒŸãƒåº§æ¨™é…åˆ—(å„ãƒã‚¹)ã”ã¨ã«
+        # ƒeƒgƒŠƒ~ƒmÀ•W”z—ñ(Šeƒ}ƒX)‚²‚Æ‚É
         judge = True
 
         debug_board = [0] * self.width * self.height
-        debug_log = "";
+        debug_log = ""
 
         for coord_x, coord_y in coordArray:
-            debug_log = debug_log+ "==("+ str(coord_x)+ ","+ str(coord_y)+ ") "
+            debug_log = debug_log + \
+                "==(" + str(coord_x) + "," + str(coord_y) + ") "
 
-            # ãƒ†ãƒˆãƒªãƒŸãƒåº§æ¨™coord_y ãŒ ç”»é¢ä¸‹é™ã‚ˆã‚Šä¸Šã€€ã‹ã¤ã€€(ãƒ†ãƒˆãƒªãƒŸãƒåº§æ¨™coord_yãŒç”»é¢ä¸Šé™ã‚ˆã‚Šä¸Š 
-            # ãƒ†ãƒˆãƒªãƒŸãƒåº§æ¨™coord_x, ãƒ†ãƒˆãƒªãƒŸãƒåº§æ¨™coord_yã®ãƒ–ãƒ­ãƒƒã‚¯ãŒãªã„)
+            # ƒeƒgƒŠƒ~ƒmÀ•Wcoord_y ‚ª ‰æ–Ê‰ºŒÀ‚æ‚èã@‚©‚Â@(ƒeƒgƒŠƒ~ƒmÀ•Wcoord_y‚ª‰æ–ÊãŒÀ‚æ‚èã
+            # ƒeƒgƒŠƒ~ƒmÀ•Wcoord_x, ƒeƒgƒŠƒ~ƒmÀ•Wcoord_y‚ÌƒuƒƒbƒN‚ª‚È‚¢)
             if 0 <= coord_x and \
-                   coord_x < self.width and \
-                   coord_y < self.height and \
-                   (coord_y * self.width + coord_x < 0 or \
-                   board[coord_y * self.width + coord_x] == 0):
+                coord_x < self.width and \
+                coord_y < self.height and \
+                (coord_y * self.width + coord_x < 0 or
+                    board[coord_y * self.width + coord_x] == 0):
 
-                # ã¯ã¾ã‚‹
-                debug_board [coord_y * self.width + coord_x] = 1
+                # ‚Í‚Ü‚é
+                debug_board[coord_y * self.width + coord_x] = 1
 
-            # ã¯ã¾ã‚‰ãªã„ã®ã§ False
+            # ‚Í‚Ü‚ç‚È‚¢‚Ì‚Å False
             else:
                 judge = False
-                # ã¯ã¾ã‚‰ãªã„
-                #self.debug_flag_try_move = 1
+                # ‚Í‚Ü‚ç‚È‚¢
+                # self.debug_flag_try_move = 1
                 if 0 <= coord_x and coord_x < self.width \
                    and 0 <= coord_y and coord_y < self.height:
-                    debug_board [coord_y * self.width + coord_x ] = 8
+                    debug_board[coord_y * self.width + coord_x] = 8
 
-        # Debug ç”¨
+        # Debug —p
         if self.debug_flag_try_move == 1:
-            print( debug_log)
-            pprint.pprint(board, width = 31, compact = True)
-            pprint.pprint(debug_board, width = 31, compact = True)
-            self.debug_flag_try_move =0
+            print(debug_log)
+            pprint.pprint(board, width=31, compact=True)
+            pprint.pprint(debug_board, width=31, compact=True)
+            self.debug_flag_try_move = 0
         return judge
 
-
     ####################################
-    #ãƒœãƒ¼ãƒ‰ã‚’ï¼’æ¬¡å…ƒåŒ–
+    # ƒ{[ƒh‚ğ‚QŸŒ³‰»
     ####################################
-    def get_reshape_backboard(self,board):
+    def get_reshape_backboard(self, board):
         board = np.array(board)
-        # é«˜ã•, å¹…ã§ reshape
-        reshape_board = board.reshape(self.height,self.width)
-        # 1, 0 ã«å¤‰æ›´
-        reshape_board = np.where(reshape_board>0,1,0)
+        # ‚‚³, •‚Å reshape
+        reshape_board = board.reshape(self.height, self.width)
+        # 1, 0 ‚É•ÏX
+        reshape_board = np.where(reshape_board > 0, 1, 0)
         return reshape_board
 
     ####################################
-    #å ±é…¬ã‚’è¨ˆç®—(2æ¬¡å…ƒç”¨) 
-    #reward_func ã‹ã‚‰å‘¼ã³å‡ºã•ã‚Œã‚‹
+    # •ñV‚ğŒvZ(2ŸŒ³—p)
+    # reward_func ‚©‚çŒÄ‚Ño‚³‚ê‚é
     ####################################
     def step_v2(self, curr_backboard, action, curr_shape_class):
+        # Ÿ‚Ì action ‚ğ index ‚ğŒ³‚ÉŒˆ’è
+        # 0: 2”Ô–Ú X²ˆÚ“®
+        # 1: 1”Ô–Ú ƒeƒgƒŠƒ~ƒm‰ñ“]
+        # 2: 3”Ô–Ú Y²~‰º (-1: ‚Å Drop)
+        # 3: 4”Ô–Ú ƒeƒgƒŠƒ~ƒm‰ñ“] (Next Turn)
+        # 4: 5”Ô–Ú X²ˆÚ“® (Next Turn)
         x0, direction0, third_y, forth_direction, fifth_x = action
-        ## ç”»é¢ãƒœãƒ¼ãƒ‰ãƒ‡ãƒ¼ã‚¿ã‚’ã‚³ãƒ”ãƒ¼ã—ã¦æŒ‡å®šåº§æ¨™ã«ãƒ†ãƒˆãƒªãƒŸãƒã‚’é…ç½®ã—è½ä¸‹ã•ã›ãŸç”»é¢ãƒœãƒ¼ãƒ‰ã¨yåº§æ¨™ã‚’è¿”ã™
-        board, drop_y = self.getBoard(curr_backboard, curr_shape_class, direction0, x0, -1)
-        ##ãƒœãƒ¼ãƒ‰ã‚’ï¼’æ¬¡å…ƒåŒ–
+        # ‰æ–Êƒ{[ƒhƒf[ƒ^‚ğƒRƒs[‚µ‚Äw’èÀ•W‚ÉƒeƒgƒŠƒ~ƒm‚ğ”z’u‚µ—‰º‚³‚¹‚½‰æ–Êƒ{[ƒh‚ÆyÀ•W‚ğ•Ô‚·
+        board, drop_y = self.getBoard(
+            curr_backboard, curr_shape_class, direction0, x0, -1)
+        # ƒ{[ƒh‚ğ‚QŸŒ³‰»
         reshape_board = self.get_reshape_backboard(board)
-        #### å ±é…¬è¨ˆç®—å…ƒã®å€¤å–å¾—
-        ## ã§ã“ã¼ã“åº¦, é«˜ã•åˆè¨ˆ, é«˜ã•æœ€å¤§, é«˜ã•æœ€å°ã‚’æ±‚ã‚ã‚‹
-        bampiness, total_height, max_height, min_height, left_side_height = self.get_bumpiness_and_height(reshape_board)
-        #max_height = self.get_max_height(reshape_board)
-        ## ç©´ã®æ•°, ç©´ã®ä¸Šç©ã¿ä¸Šã’ Penalty, æœ€ã‚‚é«˜ã„ç©´ã®ä½ç½®ã‚’æ±‚ã‚ã‚‹
-        hole_num, hole_top_penalty, max_highest_hole = self.get_holes(reshape_board, min_height)
-        ## å·¦ç«¯ã‚ã‘ãŸå½¢çŠ¶ã®å ±é…¬è¨ˆç®—
+        # •ñVŒvZŒ³‚Ì’læ“¾
+        # ‚Å‚±‚Ú‚±“x, ‚‚³‡Œv, ‚‚³Å‘å, ‚‚³Å¬‚ğ‹‚ß‚é
+        bampiness, total_height, max_height, min_height, left_side_height = self.get_bumpiness_and_height(
+            reshape_board)
+        # max_height = self.get_max_height(reshape_board)
+        # ŒŠ‚Ì”, ŒŠ‚ÌãÏ‚İã‚° Penalty, Å‚à‚‚¢ŒŠ‚ÌˆÊ’u‚ğ‹‚ß‚é
+        hole_num, hole_top_penalty, max_highest_hole = self.get_holes(
+            reshape_board, min_height)
+        # ¶’[‚ ‚¯‚½Œ`ó‚Ì•ñVŒvZ
         tetris_reward = self.get_tetris_fill_reward(reshape_board)
-        ## æ¶ˆã›ã‚‹ã‚»ãƒ«ã®ç¢ºèª
+        # Á‚¹‚éƒZƒ‹‚ÌŠm”F
         lines_cleared, reshape_board = self.check_cleared_rows(reshape_board)
-        ## å ±é…¬ã®è¨ˆç®—
-        reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0,max_height))/self.height_line_reward)
-        ## ç¶™ç¶šå ±é…¬
-        #reward += 0.01
-        #### å½¢çŠ¶ã®ç½°å ±é…¬
-        ## ã§ã“ã¼ã“åº¦ç½°
-        reward -= self.reward_weight[0] * bampiness 
-        ## æœ€å¤§é«˜ã•ç½°
+        # •ñV‚ÌŒvZ
+        reward = self.reward_list[lines_cleared] * \
+            (1 + (self.height - max(0, max_height))/self.height_line_reward)
+        # Œp‘±•ñV
+        # reward += 0.01
+        # Œ`ó‚Ì”±•ñV
+        # ‚Å‚±‚Ú‚±“x”±
+        reward -= self.reward_weight[0] * bampiness
+        # Å‘å‚‚³”±
         if max_height > self.max_height_relax:
-            reward -= self.reward_weight[1] * max(0,max_height)
-        ## ç©´ã®æ•°ç½°
+            reward -= self.reward_weight[1] * max(0, max_height)
+        # ŒŠ‚Ì””±
         reward -= self.reward_weight[2] * hole_num
-        ## ç©´ã®ä¸Šã®ãƒ–ãƒ­ãƒƒã‚¯æ•°ç½°
+        # ŒŠ‚Ìã‚ÌƒuƒƒbƒN””±
         reward -= self.hole_top_limit_reward * hole_top_penalty * max_highest_hole
-        ## å·¦ç«¯ä»¥å¤–åŸ‹ã‚ã¦ã„ã‚‹çŠ¶æ…‹å ±é…¬
+        # ¶’[ˆÈŠO–„‚ß‚Ä‚¢‚éó‘Ô•ñV
         reward += tetris_reward * self.tetris_fill_reward
-        ## å·¦ç«¯ãŒé«˜ã™ãã‚‹å ´åˆã®ç½°
+        # ¶’[‚ª‚‚·‚¬‚éê‡‚Ì”±
         if left_side_height > self.bumpiness_left_side_relax:
-            reward -= (left_side_height - self.bumpiness_left_side_relax) * self.left_side_height_penalty
+            reward -= (left_side_height - self.bumpiness_left_side_relax) * \
+                self.left_side_height_penalty
 
-        self.epoch_reward += reward 
+        self.epoch_reward += reward
 
-        # ã‚¹ã‚³ã‚¢è¨ˆç®—
+        # ƒXƒRƒAŒvZ
         self.score += self.score_list[lines_cleared]
-        # æ¶ˆå»ãƒ©ã‚¤ãƒ³ã‚«ã‚¦ãƒ³ãƒˆ
+        # Á‹ƒ‰ƒCƒ“ƒJƒEƒ“ƒg
         self.cleared_lines += lines_cleared
         self.cleared_col[lines_cleared] += 1
-        # ãƒ†ãƒˆãƒªãƒŸãƒæ•°ã‚«ã‚¦ãƒ³ãƒˆå¢—ã‚„ã™
+        # ƒeƒgƒŠƒ~ƒm”ƒJƒEƒ“ƒg‘‚â‚·
         self.tetrominoes += 1
         return reward
 
     ####################################
-    #å ±é…¬ã‚’è¨ˆç®—(1æ¬¡å…ƒç”¨) 
-    #reward_func ã‹ã‚‰å‘¼ã³å‡ºã•ã‚Œã‚‹
+    # •ñV‚ğŒvZ(1ŸŒ³—p)
+    # reward_func ‚©‚çŒÄ‚Ño‚³‚ê‚é
     ####################################
     def step(self, curr_backboard, action, curr_shape_class):
         x0, direction0, third_y, forth_direction, fifth_x = action
-        # ç”»é¢ãƒœãƒ¼ãƒ‰ãƒ‡ãƒ¼ã‚¿ã‚’ã‚³ãƒ”ãƒ¼ã—ã¦æŒ‡å®šåº§æ¨™ã«ãƒ†ãƒˆãƒªãƒŸãƒã‚’é…ç½®ã—è½ä¸‹ã•ã›ãŸç”»é¢ãƒœãƒ¼ãƒ‰ã¨yåº§æ¨™ã‚’è¿”ã™
-        board, drop_y = self.getBoard(curr_backboard, curr_shape_class, direction0, x0, -1)
-        #ãƒœãƒ¼ãƒ‰ã‚’ï¼’æ¬¡å…ƒåŒ–
+        # ‰æ–Êƒ{[ƒhƒf[ƒ^‚ğƒRƒs[‚µ‚Äw’èÀ•W‚ÉƒeƒgƒŠƒ~ƒm‚ğ”z’u‚µ—‰º‚³‚¹‚½‰æ–Êƒ{[ƒh‚ÆyÀ•W‚ğ•Ô‚·
+        board, drop_y = self.getBoard(
+            curr_backboard, curr_shape_class, direction0, x0, -1)
+        # ƒ{[ƒh‚ğ‚QŸŒ³‰»
         reshape_board = self.get_reshape_backboard(board)
-        # å ±é…¬è¨ˆç®—å…ƒã®å€¤å–å¾—
-        bampiness, height, max_height, min_height, _ = self.get_bumpiness_and_height(reshape_board)
-        #max_height = self.get_max_height(reshape_board)
-        hole_num, _ , _ = self.get_holes(reshape_board, min_height)
+        # •ñVŒvZŒ³‚Ì’læ“¾
+        bampiness, height, max_height, min_height, _ = self.get_bumpiness_and_height(
+            reshape_board)
+        # max_height = self.get_max_height(reshape_board)
+        hole_num, _, _ = self.get_holes(reshape_board, min_height)
         lines_cleared, reshape_board = self.check_cleared_rows(reshape_board)
-        #### å ±é…¬ã®è¨ˆç®—
-        reward = self.reward_list[lines_cleared] 
-        # ç¶™ç¶šå ±é…¬
-        #reward += 0.01
-        # ç½°
-        reward -= self.reward_weight[0] *bampiness 
+        # •ñV‚ÌŒvZ
+        reward = self.reward_list[lines_cleared]
+        # Œp‘±•ñV
+        # reward += 0.01
+        # ”±
+        reward -= self.reward_weight[0] * bampiness
         if max_height > self.max_height_relax:
-            reward -= self.reward_weight[1] * max(0,max_height)
+            reward -= self.reward_weight[1] * max(0, max_height)
         reward -= self.reward_weight[2] * hole_num
         self.epoch_reward += reward
 
-        # ã‚¹ã‚³ã‚¢è¨ˆç®—
+        # ƒXƒRƒAŒvZ
         self.score += self.score_list[lines_cleared]
 
-        # æ¶ˆã—ãŸæ•°è¿½åŠ 
+        # Á‚µ‚½”’Ç‰Á
         self.cleared_lines += lines_cleared
         self.cleared_col[lines_cleared] += 1
         self.tetrominoes += 1
@@ -1408,312 +1466,390 @@ class Block_Controller(object):
     ####################################
     ####################################
     ####################################
-    # æ¬¡ã®å‹•ä½œå–å¾—: ã‚²ãƒ¼ãƒ ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ©ã‹ã‚‰æ¯å›å‘¼ã°ã‚Œã‚‹
+    # Ÿ‚Ì“®ìæ“¾: ƒQ[ƒ€ƒRƒ“ƒgƒ[ƒ‰‚©‚ç–ˆ‰ñŒÄ‚Î‚ê‚é
     ####################################
     ####################################
     ####################################
     ####################################
-    def GetNextMove(self, nextMove, GameStatus, yaml_file=None,weight=None):
+    def GetNextMove(self, nextMove, GameStatus, yaml_file=None, weight=None):
 
         t1 = datetime.now()
-        # RESET é–¢æ•°è¨­å®š callback function ä»£å…¥ (Game Over æ™‚)
+        # RESET ŠÖ”İ’è callback function ‘ã“ü (Game Over )
         nextMove["option"]["reset_callback_function_addr"] = self.update
-        # mode ã®å–å¾— (train ã§ã‚ã‚‹) 
+        # mode ‚Ìæ“¾ (train ‚Å‚ ‚é)
         self.mode = GameStatus["judge_info"]["mode"]
 
         ################
-        ## åˆæœŸãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ãªã„å ´åˆã¯åˆæœŸãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿èª­ã¿è¾¼ã¿
+        # ‰Šúƒpƒ‰ƒ[ƒ^‚È‚¢ê‡‚Í‰Šúƒpƒ‰ƒ[ƒ^“Ç‚İ‚İ
         if self.init_train_parameter_flag == False:
             self.init_train_parameter_flag = True
-            self.set_parameter(yaml_file=yaml_file,predict_weight=weight)        
+            self.set_parameter(yaml_file=yaml_file, predict_weight=weight)
 
-        self.ind =GameStatus["block_info"]["currentShape"]["index"]
+        self.ind = GameStatus["block_info"]["currentShape"]["index"]
         curr_backboard = GameStatus["field_info"]["backboard"]
 
         ##################
         # default board definition
-        # self.width, self.height ã¨é‡è¤‡
+        # self.width, self.height ‚Æd•¡
         self.board_data_width = GameStatus["field_info"]["width"]
         self.board_data_height = GameStatus["field_info"]["height"]
 
         curr_shape_class = GameStatus["block_info"]["currentShape"]["class"]
-        next_shape_class= GameStatus["block_info"]["nextShape"]["class"]
+        next_shape_class = GameStatus["block_info"]["nextShape"]["class"]
+        next_next_shape_class = GameStatus["block_info"]["nextShapeList"]["element2"]["class"]
+        hold_shape_class = GameStatus["block_info"]["holdShape"]["class"]
 
         ##################
         # next shape info
         self.ShapeNone_index = GameStatus["debug_info"]["shape_info"]["shapeNone"]["index"]
-        curr_piece_id =GameStatus["block_info"]["currentShape"]["index"]
-        next_piece_id =GameStatus["block_info"]["nextShape"]["index"]
+        curr_piece_id = GameStatus["block_info"]["currentShape"]["index"]
+        next_piece_id = GameStatus["block_info"]["nextShape"]["index"]
+        next_next_piece_id = GameStatus["block_info"]["nextShapeList"]["element2"]["index"]
+        hold_piece_id = GameStatus["block_info"]["holdShape"]["index"]
 
-        #reshape_backboard = self.get_reshape_backboard(curr_backboard)
-        #print(reshape_backboard)
-        #self.state = reshape_backboard
+        # reshape_backboard = self.get_reshape_backboard(curr_backboard)
+        # print(reshape_backboard)
+        # self.state = reshape_backboard
 
         ###############################################
-        ## Move Down ã§ å‰å›ã®æŒã¡è¶Šã—å‹•ä½œãŒã‚ã‚‹å ´åˆã€€ãã®å‹•ä½œã‚’ã—ã¦çµ‚äº†
+        # Move Down ‚Å ‘O‰ñ‚Ì‚¿‰z‚µ“®ì‚ª‚ ‚éê‡@‚»‚Ì“®ì‚ğ‚µ‚ÄI—¹
         if self.skip_drop != [-1, -1, -1]:
             # third_y, forth_direction, fifth_x
             nextMove["strategy"]["direction"] = self.skip_drop[1]
-            # æ¨ªæ–¹å‘
+            # ‰¡•ûŒü
             nextMove["strategy"]["x"] = self.skip_drop[2]
-            # Move Down é™ä¸‹
+            # Move Down ~‰º
             nextMove["strategy"]["y_operation"] = 1
-            # Move Down é™ä¸‹ æ•°
+            # Move Down ~‰º ”
             nextMove["strategy"]["y_moveblocknum"] = 1
-            # å‰ã®ã‚¿ãƒ¼ãƒ³ã§ Drop ã‚’ã‚¹ã‚­ãƒƒãƒ—ã—ã¦ã„ãŸã‹ï¼Ÿã‚’è§£é™¤ (-1: ã—ã¦ã„ãªã„, ãã‚Œä»¥å¤–: ã—ã¦ã„ãŸ)
+            # ‘O‚Ìƒ^[ƒ“‚Å Drop ‚ğƒXƒLƒbƒv‚µ‚Ä‚¢‚½‚©H‚ğ‰ğœ (-1: ‚µ‚Ä‚¢‚È‚¢, ‚»‚êˆÈŠO: ‚µ‚Ä‚¢‚½)
             self.skip_drop = [-1, -1, -1]
-            ## çµ‚äº†æ™‚åˆ»
+            # I—¹
             if self.time_disp:
                 print(datetime.now()-t1)
-            ## çµ‚äº†   
+            # I—¹
             return nextMove
-        
+
         ###################
-        #ç”»é¢ãƒœãƒ¼ãƒ‰ã§ ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢çŠ¶æ…‹ ã«è½ä¸‹ã•ã›ãŸã¨ãã®æ¬¡ã®çŠ¶æ…‹ä¸€è¦§ã‚’ä½œæˆ
+        # ‰æ–Êƒ{[ƒh‚Å ƒeƒgƒŠƒ~ƒm‰ñ“]ó‘Ô ‚É—‰º‚³‚¹‚½‚Æ‚«‚ÌŸ‚Ìó‘Ôˆê——‚ğì¬
         # next_steps
-        #    Key = Tuple (ãƒ†ãƒˆãƒªãƒŸãƒç”»é¢ãƒœãƒ¼ãƒ‰Xåº§æ¨™, ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢çŠ¶æ…‹)
-        #                 ãƒ†ãƒˆãƒªãƒŸãƒ Move Down é™ä¸‹ æ•°, ãƒ†ãƒˆãƒªãƒŸãƒè¿½åŠ ç§»å‹•Xåº§æ¨™, ãƒ†ãƒˆãƒªãƒŸãƒè¿½åŠ å›è»¢)
-        #    Value = ç”»é¢ãƒœãƒ¼ãƒ‰çŠ¶æ…‹
-        next_steps = self.get_next_func(curr_backboard, curr_piece_id, curr_shape_class)
-        #print (len(next_steps), end='=>')
+        #    Key = Tuple (ƒeƒgƒŠƒ~ƒm‰æ–Êƒ{[ƒhXÀ•W, ƒeƒgƒŠƒ~ƒm‰ñ“]ó‘Ô)
+        #                 ƒeƒgƒŠƒ~ƒm Move Down ~‰º ”, ƒeƒgƒŠƒ~ƒm’Ç‰ÁˆÚ“®XÀ•W, ƒeƒgƒŠƒ~ƒm’Ç‰Á‰ñ“])
+        #    Value = ‰æ–Êƒ{[ƒhó‘Ô
+        next_steps = self.get_next_func(
+            curr_backboard, curr_piece_id, curr_shape_class)
+
+        # hold‚ğg‚Á‚½ê‡‚Ìƒpƒ^[ƒ“
+        if hold_piece_id == None:
+            # ‰‚ß‚Ä‚Ìhold‚Ìê‡
+            hold_steps = self.get_next_func(
+                curr_backboard, next_piece_id, next_shape_class)
+        else:
+            # 2‰ñ–ÚˆÈ~‚Ìê‡
+            # print(hold_piece_id)
+            hold_steps = self.get_next_func(
+                curr_backboard, hold_piece_id, hold_shape_class)
+        # print (len(next_steps), end='=>')
 
         ###############################################
         ###############################################
-        # å­¦ç¿’ã®å ´åˆ
+        # ŠwK‚Ìê‡
         ###############################################
         ###############################################
-        if self.mode=="train" or self.mode=="train_sample" or self.mode=="train_sample2":
-            #### init parameter
-            # epsilon = å­¦ç¿’çµæœã‹ã‚‰ä¹±æ•°ã§å¤‰æ›´ã™ã‚‹å‰²åˆå¯¾è±¡
-            # num_decay_epochs ã‚ˆã‚Šå‰ã¾ã§ã¯æ¯”ä¾‹ã§åˆæœŸ epsilon ã‹ã‚‰æ¸›ã‚‰ã—ã¦ã„ã
-            # num_decay_ecpchs ä»¥é™ã¯ final_epsilonå›ºå®š
+        if self.mode == "train" or self.mode == "train_sample" or self.mode == "train_sample2":
+            # init parameter
+            # epsilon = ŠwKŒ‹‰Ê‚©‚ç—”‚Å•ÏX‚·‚éŠ„‡‘ÎÛ
+            # num_decay_epochs ‚æ‚è‘O‚Ü‚Å‚Í”ä—á‚Å‰Šú epsilon ‚©‚çŒ¸‚ç‚µ‚Ä‚¢‚­
+            # num_decay_ecpchs ˆÈ~‚Í final_epsilonŒÅ’è
             epsilon = self.final_epsilon + (max(self.num_decay_epochs - self.epoch, 0) * (
-                    self.initial_epsilon - self.final_epsilon) / self.num_decay_epochs)
+                self.initial_epsilon - self.final_epsilon) / self.num_decay_epochs)
             u = random()
-            # epsilon ã‚ˆã‚Šä¹±æ•° u ãŒå°ã•ã„å ´åˆãƒ•ãƒ©ã‚°ã‚’ãŸã¦ã‚‹
+            # epsilon ‚æ‚è—” u ‚ª¬‚³‚¢ê‡ƒtƒ‰ƒO‚ğ‚½‚Ä‚é
             random_action = u <= epsilon
 
-            # æ¬¡ã®ãƒ†ãƒˆãƒªãƒŸãƒäºˆæ¸¬
+            # Ÿ‚ÌƒeƒgƒŠƒ~ƒm—\‘ª
             if self.predict_next_num_train > 0:
                 ##########################
-                # ãƒ¢ãƒ‡ãƒ«ã®å­¦ç¿’å®Ÿæ–½
+                # ƒ‚ƒfƒ‹‚ÌŠwKÀ{
                 ##########################
                 self.model.train()
-                # index_list [1ç•ªç›®index, 2ç•ªç›®index, 3ç•ªç›®index ...] => q
+                # index_list [1”Ô–Úindex, 2”Ô–Úindex, 3”Ô–Úindex ...] => q
                 index_list = []
-                # index_list_to_q (1ç•ªç›®index, 2ç•ªç›®index, 3ç•ªç›®index ...) => q
+                hold_index_list = []
+                # index_list_to_q (1”Ô–Úindex, 2”Ô–Úindex, 3”Ô–Úindex ...) => q
                 index_list_to_q = {}
+                hold_index_list_to_q = {}
                 ######################
-                # æ¬¡ã®äºˆæ¸¬ã‚’ä¸Šä½predict_next_steps_trainã¤å®Ÿæ–½, 1ç•ªç›®ã‹ã‚‰predict_next_num_trainç•ªç›®ã¾ã§äºˆæ¸¬
+                # Ÿ‚Ì—\‘ª‚ğãˆÊpredict_next_steps_train‚ÂÀ{, 1”Ô–Ú‚©‚çpredict_next_num_train”Ô–Ú‚Ü‚Å—\‘ª
                 index_list, index_list_to_q, next_actions, next_states \
-                            = self.get_predictions(self.model, True, GameStatus, next_steps, self.predict_next_steps_train, 1, self.predict_next_num_train, index_list, index_list_to_q, -60000)
-                #print(index_list_to_q)
-                #print("max")
+                    = self.get_predictions(self.model, True, GameStatus, next_steps, self.predict_next_steps_train, 1, self.predict_next_num_train, index_list, index_list_to_q, -60000)
+                # print(index_list_to_q)
+                # print("max")
+                hold_index_list, hold_index_list_to_q, hold_next_actions, hold_next_states \
+                    = self.get_predictions(self.model, True, GameStatus, hold_steps, self.predict_next_steps_train, 1, self.predict_next_num_train, hold_index_list, hold_index_list_to_q, -60000)
 
-                # å…¨äºˆæ¸¬ã®æœ€å¤§ q
+                # ‘S—\‘ª‚ÌÅ‘å q
                 max_index_list = max(index_list_to_q, key=index_list_to_q.get)
-                #print(max(index_list_to_q, key=index_list_to_q.get))
-                #print(max_index_list[0].item())
-                #print (len(next_steps))
-                #print("============================")
-                # ä¹±æ•°ãŒ epsilon ã‚ˆã‚Šå°ã•ã„å ´åˆã¯
+                hold_max_index_list = max(
+                    hold_index_list_to_q, key=hold_index_list_to_q.get)
+
+                # ƒz[ƒ‹ƒh‚µ‚½‚Ù‚¤‚ªQ’l‚ª—Ç‚©‚Á‚½‚Æ‚«‚Í•Ï”‚ğƒz[ƒ‹ƒh‚Ìê‡‚É‘“ü‚ê‘Ö‚¦‚·‚é
+                # ˆê“x–Ú‚Ìƒz[ƒ‹ƒh‚Ìê‡‚Íaction‚Í–³‹‚³‚êŸ‚Ìƒ^[ƒ“‚Æ‚È‚èA“ñ“x–ÚˆÈ~‚Ìƒz[ƒ‹ƒh‚Ìê‡‚Íƒz[ƒ‹ƒh‚³‚ê‚Ä‚¢‚½ƒ~ƒm‚Ì“®ì‚ğaction‚ÉŠi”[‚·‚é
+                if index_list_to_q[tuple(max_index_list)] < hold_index_list_to_q[tuple(hold_max_index_list)]:
+                    nextMove["strategy"]["use_hold_function"] = "y"
+                    next_steps = hold_steps
+                    index_list = hold_index_list
+                    index_list_to_q = hold_index_list_to_q
+                    next_actions = hold_next_actions
+                    next_states = hold_next_states
+                    max_index_list = hold_max_index_list
+
+                # print(max(index_list_to_q, key=index_list_to_q.get))
+                # print(max_index_list[0].item())
+                # print (len(next_steps))
+                # print("============================")
+                # —”‚ª epsilon ‚æ‚è¬‚³‚¢ê‡‚Í
                 if random_action:
-                    # index ã‚’ä¹±æ•°ã¨ã™ã‚‹
+                    # index ‚ğ—”‚Æ‚·‚é
                     index = randint(0, len(next_steps) - 1)
                 else:
-                    # 1æ‰‹ç›®ã® index å…¥æ‰‹
+                    # 1è–Ú‚Ì index “üè
                     index = max_index_list[0].item()
             else:
-                # æ¬¡ã®çŠ¶æ…‹ä¸€è¦§ã® action ã¨ states ã§é…åˆ—åŒ–
-                #    next_actions  = Tuple (ãƒ†ãƒˆãƒªãƒŸãƒç”»é¢ãƒœãƒ¼ãƒ‰Xåº§æ¨™, ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢çŠ¶æ…‹)ã€€ä¸€è¦§
-                #    next_states = ç”»é¢ãƒœãƒ¼ãƒ‰çŠ¶æ…‹ ä¸€è¦§
+                # Ÿ‚Ìó‘Ôˆê——‚Ì action ‚Æ states ‚Å”z—ñ‰»
+                #    next_actions  = Tuple (ƒeƒgƒŠƒ~ƒm‰æ–Êƒ{[ƒhXÀ•W, ƒeƒgƒŠƒ~ƒm‰ñ“]ó‘Ô)@ˆê——
+                #    next_states = ‰æ–Êƒ{[ƒhó‘Ô ˆê——
                 next_actions, next_states = zip(*next_steps.items())
-                # next_states (ç”»é¢ãƒœãƒ¼ãƒ‰çŠ¶æ…‹ ä¸€è¦§) ã®ãƒ†ãƒ³ã‚½ãƒ«ã‚’é€£çµ (ç”»é¢ãƒœãƒ¼ãƒ‰çŠ¶æ…‹ã®list ã®æœ€åˆã®è¦ç´ ã«çŠ¶æ…‹ãŒè¿½åŠ ã•ã‚ŒãŸ)
+                hold_next_actions, hold_next_states = zip(*hold_steps.items())
+                # next_states (‰æ–Êƒ{[ƒhó‘Ô ˆê——) ‚Ìƒeƒ“ƒ\ƒ‹‚ğ˜AŒ‹ (‰æ–Êƒ{[ƒhó‘Ô‚Ìlist ‚ÌÅ‰‚Ì—v‘f‚Éó‘Ô‚ª’Ç‰Á‚³‚ê‚½)
                 next_states = torch.stack(next_states)
+                hold_next_states = torch.stack(hold_next_states)
 
-                ## GPU ä½¿ç”¨ã§ãã‚‹ã¨ãã¯ä½¿ã†
+                # GPU g—p‚Å‚«‚é‚Æ‚«‚Íg‚¤
 #                if torch.cuda.is_available():
 #                    next_states = next_states.cuda()
-            
+
                 ##########################
-                # ãƒ¢ãƒ‡ãƒ«ã®å­¦ç¿’å®Ÿæ–½
+                # ƒ‚ƒfƒ‹‚ÌŠwKÀ{
                 ##########################
                 self.model.train()
-                # ãƒ†ãƒ³ã‚½ãƒ«ã®å‹¾é…ã®è¨ˆç®—ã‚’ä¸å¯ã¨ã™ã‚‹(Tensor.backward() ã‚’å‘¼ã³å‡ºã•ãªã„ã“ã¨ãŒç¢ºå®Ÿãªå ´åˆ)
+                # ƒeƒ“ƒ\ƒ‹‚ÌŒù”z‚ÌŒvZ‚ğ•s‰Â‚Æ‚·‚é(Tensor.backward() ‚ğŒÄ‚Ño‚³‚È‚¢‚±‚Æ‚ªŠmÀ‚Èê‡)
                 with torch.no_grad():
-                    # é †ä¼æ¬ã— Q å€¤ã‚’å–å¾— (model ã® __call__ â‰’ forward)
+                    # ‡“`”À‚µ Q ’l‚ğæ“¾ (model ‚Ì __call__ à forward)
                     predictions = self.model(next_states)[:, 0]
+                    hold_predictions = self.model(hold_next_states)[:, 0]
                     # predict = self.model(next_states)[:,:]
                     # predictions = predict[:,0]
                     # print("input: ", next_states)
                     # print("predict: ", predict[:,0])
 
-                # ä¹±æ•°ãŒ epsilon ã‚ˆã‚Šå°ã•ã„å ´åˆã¯
+                if max(predictions) < max(hold_predictions):
+                    nextMove["strategy"]["use_hold_function"] = "y"
+                    next_steps = hold_steps
+                    next_actions = hold_next_actions
+                    next_states = hold_next_states
+                    predictions = hold_predictions
+
+                # —”‚ª epsilon ‚æ‚è¬‚³‚¢ê‡‚Í
                 if random_action:
-                    # index ã‚’ä¹±æ•°ã¨ã™ã‚‹
+                    # index ‚ğ—”‚Æ‚·‚é
                     index = randint(0, len(next_steps) - 1)
                 else:
-                    # index ã‚’æ¨è«–ã®æœ€å¤§å€¤ã¨ã™ã‚‹
+                    # index ‚ğ„˜_‚ÌÅ‘å’l‚Æ‚·‚é
                     index = torch.argmax(predictions).item()
 
-            # æ¬¡ã® action states ã‚’ä¸Šè¨˜ã® index å…ƒã«æ±ºå®š
+            # Ÿ‚Ì action states ‚ğã‹L‚Ì index Œ³‚ÉŒˆ’è
             next_state = next_states[index, :]
 
-            # index ã«ã¦æ¬¡ã® action ã®æ±ºå®š 
-            # action ã® list
-            # 0: 2ç•ªç›® Xè»¸ç§»å‹•
-            # 1: 1ç•ªç›® ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢
-            # 2: 3ç•ªç›® Yè»¸é™ä¸‹ (-1: ã§ Drop)
-            # 3: 4ç•ªç›® ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢ (Next Turn)
-            # 4: 5ç•ªç›® Xè»¸ç§»å‹• (Next Turn)
+            # index ‚É‚ÄŸ‚Ì action ‚ÌŒˆ’è
+            # action ‚Ì list
+            # 0: 2”Ô–Ú X²ˆÚ“®
+            # 1: 1”Ô–Ú ƒeƒgƒŠƒ~ƒm‰ñ“]
+            # 2: 3”Ô–Ú Y²~‰º (-1: ‚Å Drop)
+            # 3: 4”Ô–Ú ƒeƒgƒŠƒ~ƒm‰ñ“] (Next Turn)
+            # 4: 5”Ô–Ú X²ˆÚ“® (Next Turn)
             action = next_actions[index]
-            # step, step_v2 ã«ã‚ˆã‚Šå ±é…¬è¨ˆç®—
-            reward = self.reward_func(curr_backboard, action, curr_shape_class)
-            
-            done = False #game over flag
-            
+            # step, step_v2 ‚É‚æ‚è•ñVŒvZ
+            if nextMove["strategy"]["use_hold_function"] == "y":
+                if hold_piece_id == None:
+                    # ƒ^[ƒ“‚ğÁ”ï‚·‚é‚Ì‚Å‚¿‚å‚Á‚Æ‚¾‚¯‚æ‚­‚È‚¢
+                    reward = -0.001
+                else:
+                    reward = self.reward_func(
+                        curr_backboard, action, hold_shape_class)
+            else:
+                reward = self.reward_func(
+                    curr_backboard, action, curr_shape_class)
+
+            done = False  # game over flag
+
             #####################################
-            # Double DQN æœ‰åŠ¹æ™‚
-            #======predict max_a Q(s_(t+1),a)======
-            #if use double dqn, predicted by main model
+            # Double DQN —LŒø
+            # ======predict max_a Q(s_(t+1),a)======
+            # if use double dqn, predicted by main model
             if self.double_dqn:
-                # ç”»é¢ãƒœãƒ¼ãƒ‰ãƒ‡ãƒ¼ã‚¿ã‚’ã‚³ãƒ”ãƒ¼ã—ã¦ æŒ‡å®šåº§æ¨™ã«ãƒ†ãƒˆãƒªãƒŸãƒã‚’é…ç½®ã—è½ä¸‹ã•ã›ãŸç”»é¢ãƒœãƒ¼ãƒ‰ã¨yåº§æ¨™ã‚’è¿”ã™
-                next_backboard, drop_y  = self.getBoard(curr_backboard, curr_shape_class, action[1], action[0], action[2])
-                #ç”»é¢ãƒœãƒ¼ãƒ‰ã§ ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢çŠ¶æ…‹ ã«è½ä¸‹ã•ã›ãŸã¨ãã®æ¬¡ã®çŠ¶æ…‹ä¸€è¦§ã‚’ä½œæˆ
-                next2_steps = self.get_next_func(next_backboard, next_piece_id, next_shape_class)
-                # æ¬¡ã®çŠ¶æ…‹ä¸€è¦§ã® action ã¨ states ã§é…åˆ—åŒ–
+                # ‰æ–Êƒ{[ƒhƒf[ƒ^‚ğƒRƒs[‚µ‚Ä w’èÀ•W‚ÉƒeƒgƒŠƒ~ƒm‚ğ”z’u‚µ—‰º‚³‚¹‚½‰æ–Êƒ{[ƒh‚ÆyÀ•W‚ğ•Ô‚·
+                if nextMove["strategy"]["use_hold_function"] == "y":
+                    if hold_piece_id == None:
+                        next_backboard = curr_backboard
+                        drop_y = 0  # ‚Æ‚è‚ ‚¦‚¸“ü‚ê‚Ä‚¢‚é‚¾‚¯Bg‚í‚È‚¢‚Í‚¸
+                    else:
+                        next_backboard, drop_y = self.getBoard(
+                            curr_backboard, hold_shape_class, action[1], action[0], action[2])
+                else:
+                    next_backboard, drop_y = self.getBoard(
+                        curr_backboard, curr_shape_class, action[1], action[0], action[2])
+
+                # ‰æ–Êƒ{[ƒh‚Å ƒeƒgƒŠƒ~ƒm‰ñ“]ó‘Ô ‚É—‰º‚³‚¹‚½‚Æ‚«‚ÌŸ‚Ìó‘Ôˆê——‚ğì¬
+                next2_steps = self.get_next_func(
+                    next_backboard, next_piece_id, next_shape_class)
+                # Ÿ‚ªƒz[ƒ‹ƒh‚Ìê‡‚Í¡‚Íl‚¦‚È‚¢‚±‚Æ‚Æ‚·‚é
+                # if nextMove["strategy"]["use_hold_function"] == "y" and hold_piece_id == None:
+                #     next2_steps = self.get_next_func(
+                #         next_backboard, next_piece_id, next_shape_class)
+                # else:
+                #     next2_steps = self.get_next_func(
+                #         next_backboard, next_piece_id, next_shape_class)
+                #     hold_next2_steps = self.get_next_func(
+                #         next_backboard, next_next_piece_id, next_next_shape_class)
+
+                # Ÿ‚Ìó‘Ôˆê——‚Ì action ‚Æ states ‚Å”z—ñ‰»
                 next2_actions, next2_states = zip(*next2_steps.items())
-                # next_states ã®ãƒ†ãƒ³ã‚½ãƒ«ã‚’é€£çµ
+                # next_states ‚Ìƒeƒ“ƒ\ƒ‹‚ğ˜AŒ‹
                 next2_states = torch.stack(next2_states)
-                ## GPU ä½¿ç”¨ã§ãã‚‹ã¨ãã¯ä½¿ã†
+                # GPU g—p‚Å‚«‚é‚Æ‚«‚Íg‚¤
 #                if torch.cuda.is_available():
 #                    next2_states = next2_states.cuda()
                 ##########################
-                # ãƒ¢ãƒ‡ãƒ«ã®å­¦ç¿’å®Ÿæ–½
+                # ƒ‚ƒfƒ‹‚ÌŠwKÀ{
                 ##########################
                 self.model.train()
-                # ãƒ†ãƒ³ã‚½ãƒ«ã®å‹¾é…ã®è¨ˆç®—ã‚’ä¸å¯ã¨ã™ã‚‹
+                # ƒeƒ“ƒ\ƒ‹‚ÌŒù”z‚ÌŒvZ‚ğ•s‰Â‚Æ‚·‚é
                 with torch.no_grad():
-                    # é †ä¼æ¬ã— Q å€¤ã‚’å–å¾— (model ã® __call__ â‰’ forward)
+                    # ‡“`”À‚µ Q ’l‚ğæ“¾ (model ‚Ì __call__ à forward)
                     next_predictions = self.model(next2_states)[:, 0]
-                # æ¬¡ã® index ã‚’æ¨è«–ã®æœ€å¤§å€¤ã¨ã™ã‚‹
+                # Ÿ‚Ì index ‚ğ„˜_‚ÌÅ‘å’l‚Æ‚·‚é
                 next_index = torch.argmax(next_predictions).item()
-                # æ¬¡ã®çŠ¶æ…‹ã‚’ index ã§æŒ‡å®šã—å–å¾—
+                # Ÿ‚Ìó‘Ô‚ğ index ‚Åw’è‚µæ“¾
                 next2_state = next2_states[next_index, :]
 
             ################################
-            # Target Next æœ‰åŠ¹æ™‚
-            #if use target net, predicted by target model
-            elif self.target_net:
-                # ç”»é¢ãƒœãƒ¼ãƒ‰ãƒ‡ãƒ¼ã‚¿ã‚’ã‚³ãƒ”ãƒ¼ã—ã¦ æŒ‡å®šåº§æ¨™ã«ãƒ†ãƒˆãƒªãƒŸãƒã‚’é…ç½®ã—è½ä¸‹ã•ã›ãŸç”»é¢ãƒœãƒ¼ãƒ‰ã¨yåº§æ¨™ã‚’è¿”ã™
-                next_backboard, drop_y  = self.getBoard(curr_backboard, curr_shape_class, action[1], action[0], action[2])
-                #ç”»é¢ãƒœãƒ¼ãƒ‰ã§ ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢çŠ¶æ…‹ ã«è½ä¸‹ã•ã›ãŸã¨ãã®æ¬¡ã®çŠ¶æ…‹ä¸€è¦§ã‚’ä½œæˆ
-                next2_steps =self.get_next_func(next_backboard, next_piece_id, next_shape_class)
-                # æ¬¡ã®çŠ¶æ…‹ä¸€è¦§ã® action ã¨ states ã§é…åˆ—åŒ–
-                next2_actions, next2_states = zip(*next2_steps.items())
-                # next_states ã®ãƒ†ãƒ³ã‚½ãƒ«ã‚’é€£çµ
-                next2_states = torch.stack(next2_states)
-                ## GPU ä½¿ç”¨ã§ãã‚‹ã¨ãã¯ä½¿ã†
-#                if torch.cuda.is_available():
-#                    next2_states = next2_states.cuda()
-                ##########################
-                # ãƒ¢ãƒ‡ãƒ«ã®å­¦ç¿’å®Ÿæ–½
-                ##########################
-                self.target_model.train()
-                # ãƒ†ãƒ³ã‚½ãƒ«ã®å‹¾é…ã®è¨ˆç®—ã‚’ä¸å¯ã¨ã™ã‚‹
-                with torch.no_grad():
-                    #### ã€ã‚¿ãƒ¼ã‚²ãƒƒãƒˆãƒ¢ãƒ‡ãƒ«ã€ã§ Qå€¤ç®—å‡º
-                    next_predictions = self.target_model(next2_states)[:, 0]
-                # æ¬¡ã® index ã‚’æ¨è«–ã®æœ€å¤§å€¤ã¨ã™ã‚‹
-                next_index = torch.argmax(next_predictions).item()
-                # æ¬¡ã®çŠ¶æ…‹ã‚’ index ã§æŒ‡å®šã—å–å¾—
-                next2_state = next2_states[next_index, :]
-                
-            #if not use target net,predicted by main model
-            else:
-                # ç”»é¢ãƒœãƒ¼ãƒ‰ãƒ‡ãƒ¼ã‚¿ã‚’ã‚³ãƒ”ãƒ¼ã—ã¦ æŒ‡å®šåº§æ¨™ã«ãƒ†ãƒˆãƒªãƒŸãƒã‚’é…ç½®ã—è½ä¸‹ã•ã›ãŸç”»é¢ãƒœãƒ¼ãƒ‰ã¨yåº§æ¨™ã‚’è¿”ã™
-                next_backboard, drop_y  = self.getBoard(curr_backboard, curr_shape_class, action[1], action[0], action[2])
-                #ç”»é¢ãƒœãƒ¼ãƒ‰ã§ ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢çŠ¶æ…‹ ã«è½ä¸‹ã•ã›ãŸã¨ãã®æ¬¡ã®çŠ¶æ…‹ä¸€è¦§ã‚’ä½œæˆ
-                next2_steps =self.get_next_func(next_backboard, next_piece_id, next_shape_class)
-                # æ¬¡ã®çŠ¶æ…‹ä¸€è¦§ã® action ã¨ states ã§é…åˆ—åŒ–
-                next2_actions, next2_states = zip(*next2_steps.items())
-                # æ¬¡ã®çŠ¶æ…‹ã‚’ index ã§æŒ‡å®šã—å–å¾—
-                next2_states = torch.stack(next2_states)
+            # Target Next —LŒø
+            # if use target net, predicted by target model
+#             elif self.target_net:
+#                 # ‰æ–Êƒ{[ƒhƒf[ƒ^‚ğƒRƒs[‚µ‚Ä w’èÀ•W‚ÉƒeƒgƒŠƒ~ƒm‚ğ”z’u‚µ—‰º‚³‚¹‚½‰æ–Êƒ{[ƒh‚ÆyÀ•W‚ğ•Ô‚·
+#                 next_backboard, drop_y = self.getBoard(
+#                     curr_backboard, curr_shape_class, action[1], action[0], action[2])
+#                 # ‰æ–Êƒ{[ƒh‚Å ƒeƒgƒŠƒ~ƒm‰ñ“]ó‘Ô ‚É—‰º‚³‚¹‚½‚Æ‚«‚ÌŸ‚Ìó‘Ôˆê——‚ğì¬
+#                 next2_steps = self.get_next_func(
+#                     next_backboard, next_piece_id, next_shape_class)
+#                 # Ÿ‚Ìó‘Ôˆê——‚Ì action ‚Æ states ‚Å”z—ñ‰»
+#                 next2_actions, next2_states = zip(*next2_steps.items())
+#                 # next_states ‚Ìƒeƒ“ƒ\ƒ‹‚ğ˜AŒ‹
+#                 next2_states = torch.stack(next2_states)
+#                 # GPU g—p‚Å‚«‚é‚Æ‚«‚Íg‚¤
+# #                if torch.cuda.is_available():
+# #                    next2_states = next2_states.cuda()
+#                 ##########################
+#                 # ƒ‚ƒfƒ‹‚ÌŠwKÀ{
+#                 ##########################
+#                 self.target_model.train()
+#                 # ƒeƒ“ƒ\ƒ‹‚ÌŒù”z‚ÌŒvZ‚ğ•s‰Â‚Æ‚·‚é
+#                 with torch.no_grad():
+#                     # wƒ^[ƒQƒbƒgƒ‚ƒfƒ‹x‚Å Q’lZo
+#                     next_predictions = self.target_model(next2_states)[:, 0]
+#                 # Ÿ‚Ì index ‚ğ„˜_‚ÌÅ‘å’l‚Æ‚·‚é
+#                 next_index = torch.argmax(next_predictions).item()
+#                 # Ÿ‚Ìó‘Ô‚ğ index ‚Åw’è‚µæ“¾
+#                 next2_state = next2_states[next_index, :]
 
-                ## GPU ä½¿ç”¨ã§ãã‚‹ã¨ãã¯ä½¿ã†
-#                if torch.cuda.is_available():
-#                    next2_states = next2_states.cuda()
-                ##########################
-                # ãƒ¢ãƒ‡ãƒ«ã®å­¦ç¿’å®Ÿæ–½
-                ##########################
-                self.model.train()
-                # ãƒ†ãƒ³ã‚½ãƒ«ã®å‹¾é…ã®è¨ˆç®—ã‚’ä¸å¯ã¨ã™ã‚‹
-                with torch.no_grad():
-                    # é †ä¼æ¬ã— Q å€¤ã‚’å–å¾— (model ã® __call__ â‰’ forward)
-                    next_predictions = self.model(next2_states)[:, 0]
+#             # if not use target net,predicted by main model
+#             else:
+#                 # ‰æ–Êƒ{[ƒhƒf[ƒ^‚ğƒRƒs[‚µ‚Ä w’èÀ•W‚ÉƒeƒgƒŠƒ~ƒm‚ğ”z’u‚µ—‰º‚³‚¹‚½‰æ–Êƒ{[ƒh‚ÆyÀ•W‚ğ•Ô‚·
+#                 next_backboard, drop_y = self.getBoard(
+#                     curr_backboard, curr_shape_class, action[1], action[0], action[2])
+#                 # ‰æ–Êƒ{[ƒh‚Å ƒeƒgƒŠƒ~ƒm‰ñ“]ó‘Ô ‚É—‰º‚³‚¹‚½‚Æ‚«‚ÌŸ‚Ìó‘Ôˆê——‚ğì¬
+#                 next2_steps = self.get_next_func(
+#                     next_backboard, next_piece_id, next_shape_class)
+#                 # Ÿ‚Ìó‘Ôˆê——‚Ì action ‚Æ states ‚Å”z—ñ‰»
+#                 next2_actions, next2_states = zip(*next2_steps.items())
+#                 # Ÿ‚Ìó‘Ô‚ğ index ‚Åw’è‚µæ“¾
+#                 next2_states = torch.stack(next2_states)
 
-                # epsilon = å­¦ç¿’çµæœã‹ã‚‰ä¹±æ•°ã§å¤‰æ›´ã™ã‚‹å‰²åˆå¯¾è±¡
-                # num_decay_epochs ã‚ˆã‚Šå‰ã¾ã§ã¯æ¯”ä¾‹ã§åˆæœŸ epsilon ã‹ã‚‰æ¸›ã‚‰ã—ã¦ã„ã
-                # num_decay_ecpchs ä»¥é™ã¯ final_epsilonå›ºå®š
-                epsilon = self.final_epsilon + (max(self.num_decay_epochs - self.epoch, 0) * (
-                self.initial_epsilon - self.final_epsilon) / self.num_decay_epochs)
-                u = random()
-                # epsilon ã‚ˆã‚Šä¹±æ•° u ãŒå°ã•ã„å ´åˆãƒ•ãƒ©ã‚°ã‚’ãŸã¦ã‚‹
-                random_action = u <= epsilon
-                
-                # ä¹±æ•°ãŒ epsilon ã‚ˆã‚Šå°ã•ã„å ´åˆã¯
-                if random_action:
-                    # index ã‚’ä¹±æ•°æŒ‡å®š
-                    next_index = randint(0, len(next2_steps) - 1)
-                else:
-                   # æ¬¡ã® index ã‚’æ¨è«–ã®æœ€å¤§å€¤ã¨ã™ã‚‹
-                    next_index = torch.argmax(next_predictions).item()
-                # æ¬¡ã®çŠ¶æ…‹ã‚’ index ã«ã‚ˆã‚ŠæŒ‡å®š
-                next2_state = next2_states[next_index, :]
+#                 # GPU g—p‚Å‚«‚é‚Æ‚«‚Íg‚¤
+# #                if torch.cuda.is_available():
+# #                    next2_states = next2_states.cuda()
+#                 ##########################
+#                 # ƒ‚ƒfƒ‹‚ÌŠwKÀ{
+#                 ##########################
+#                 self.model.train()
+#                 # ƒeƒ“ƒ\ƒ‹‚ÌŒù”z‚ÌŒvZ‚ğ•s‰Â‚Æ‚·‚é
+#                 with torch.no_grad():
+#                     # ‡“`”À‚µ Q ’l‚ğæ“¾ (model ‚Ì __call__ à forward)
+#                     next_predictions = self.model(next2_states)[:, 0]
 
-            #=======================================
-            # Episode Memory ã«
-            # next_state  æ¬¡ã®å€™è£œç¬¬1ä½æ‰‹
-            # reward å ±é…¬
-            # next2_state æ¯”è¼ƒå¯¾è±¡ã®ãƒ¢ãƒ‡ãƒ«ã«ã‚ˆã‚‹å€™è£œæ‰‹ (Target net ãªã©)
+#                 # epsilon = ŠwKŒ‹‰Ê‚©‚ç—”‚Å•ÏX‚·‚éŠ„‡‘ÎÛ
+#                 # num_decay_epochs ‚æ‚è‘O‚Ü‚Å‚Í”ä—á‚Å‰Šú epsilon ‚©‚çŒ¸‚ç‚µ‚Ä‚¢‚­
+#                 # num_decay_ecpchs ˆÈ~‚Í final_epsilonŒÅ’è
+#                 epsilon = self.final_epsilon + (max(self.num_decay_epochs - self.epoch, 0) * (
+#                     self.initial_epsilon - self.final_epsilon) / self.num_decay_epochs)
+#                 u = random()
+#                 # epsilon ‚æ‚è—” u ‚ª¬‚³‚¢ê‡ƒtƒ‰ƒO‚ğ‚½‚Ä‚é
+#                 random_action = u <= epsilon
+
+#                 # —”‚ª epsilon ‚æ‚è¬‚³‚¢ê‡‚Í
+#                 if random_action:
+#                     # index ‚ğ—”w’è
+#                     next_index = randint(0, len(next2_steps) - 1)
+#                 else:
+#                    # Ÿ‚Ì index ‚ğ„˜_‚ÌÅ‘å’l‚Æ‚·‚é
+#                     next_index = torch.argmax(next_predictions).item()
+#                 # Ÿ‚Ìó‘Ô‚ğ index ‚É‚æ‚èw’è
+#                 next2_state = next2_states[next_index, :]
+
+            # =======================================
+            # Episode Memory ‚É
+            # next_state  Ÿ‚ÌŒó•â‘æ1ˆÊè
+            # reward •ñV
+            # next2_state ”äŠr‘ÎÛ‚Ìƒ‚ƒfƒ‹‚É‚æ‚éŒó•âè (Target net ‚È‚Ç)
             # done Game Over flag
-            #self.replay_memory.append([next_state, reward, next2_state,done])
+            # self.replay_memory.append([next_state, reward, next2_state,done])
             self.episode_memory.append([next_state, reward, next2_state, done])
-            # å„ªå…ˆé †ä½ã¤ãçµŒé¨“å­¦ç¿’æœ‰åŠ¹ãªã‚‰ã°
+            # —Dæ‡ˆÊ‚Â‚«ŒoŒ±ŠwK—LŒø‚È‚ç‚Î
             if self.prioritized_replay:
-                # ã‚­ãƒ¥ãƒ¼ã«ãƒªãƒ—ãƒ¬ã‚¤ç”¨ã®æƒ…å ±ã‚’æ ¼ç´ã—ã¦ã„ã
+                # ƒLƒ…[‚ÉƒŠƒvƒŒƒC—p‚Ìî•ñ‚ğŠi”[‚µ‚Ä‚¢‚­
                 self.PER.store()
-            
-            #self.replay_memory.append([self.state, reward, next_state,done])
+
+            # self.replay_memory.append([self.state, reward, next_state,done])
 
             ###############################################
-            ## å­¦ç¿’æ™‚ æ¬¡ã®å‹•ä½œæŒ‡å®š
+            # ŠwK Ÿ‚Ì“®ìw’è
             ###############################################
-            ## å‰ã®ã‚¿ãƒ¼ãƒ³ã§ Drop ã‚’ã‚¹ã‚­ãƒƒãƒ—ã—ã¦ã„ãŸã‹ï¼Ÿ (-1: ã—ã¦ã„ãªã„, ãã‚Œä»¥å¤–: ã—ã¦ã„ãŸ)
+            # ‘O‚Ìƒ^[ƒ“‚Å Drop ‚ğƒXƒLƒbƒv‚µ‚Ä‚¢‚½‚©H (-1: ‚µ‚Ä‚¢‚È‚¢, ‚»‚êˆÈŠO: ‚µ‚Ä‚¢‚½)
             # third_y, forth_direction, fifth_x
-            #self.skip_drop = [-1, -1, -1]
-        
-            # ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢
+            # self.skip_drop = [-1, -1, -1]
+
+            # ƒeƒgƒŠƒ~ƒm‰ñ“]
             nextMove["strategy"]["direction"] = action[1]
-            # æ¨ªæ–¹å‘
+            # ‰¡•ûŒü
             nextMove["strategy"]["x"] = action[0]
             ###########
-            # Drop Down è½ä¸‹ã®å ´åˆ
+            # Drop Down —‰º‚Ìê‡
             if action[2] == -1 and action[3] == -1 and action[4] == -1:
-                # Drop Down è½ä¸‹
+                # Drop Down —‰º
                 nextMove["strategy"]["y_operation"] = 1
-                # Move Down é™ä¸‹æ•°
+                # Move Down ~‰º”
                 nextMove["strategy"]["y_moveblocknum"] = 1
-                # å‰ã®ã‚¿ãƒ¼ãƒ³ã§ Drop ã‚’ã‚¹ã‚­ãƒƒãƒ—ã—ã¦ã„ãŸã‹ï¼Ÿ (-1: ã—ã¦ã„ãªã„, ãã‚Œä»¥å¤–: ã—ã¦ã„ãŸ)
+                # ‘O‚Ìƒ^[ƒ“‚Å Drop ‚ğƒXƒLƒbƒv‚µ‚Ä‚¢‚½‚©H (-1: ‚µ‚Ä‚¢‚È‚¢, ‚»‚êˆÈŠO: ‚µ‚Ä‚¢‚½)
                 self.skip_drop = [-1, -1, -1]
             ###########
-            # Move Down é™ä¸‹ã®å ´åˆ
+            # Move Down ~‰º‚Ìê‡
             else:
-                # Move Down é™ä¸‹
+                # Move Down ~‰º
                 nextMove["strategy"]["y_operation"] = 0
-                # Move Down é™ä¸‹ æ•°
+                # Move Down ~‰º ”
                 nextMove["strategy"]["y_moveblocknum"] = action[2]
-                # å‰ã®ã‚¿ãƒ¼ãƒ³ã§ Drop ã‚’ã‚¹ã‚­ãƒƒãƒ—ã—ã¦ã„ãŸã‹ï¼Ÿ (-1: ã—ã¦ã„ãªã„, ãã‚Œä»¥å¤–: ã—ã¦ã„ãŸ)
+                # ‘O‚Ìƒ^[ƒ“‚Å Drop ‚ğƒXƒLƒbƒv‚µ‚Ä‚¢‚½‚©H (-1: ‚µ‚Ä‚¢‚È‚¢, ‚»‚êˆÈŠO: ‚µ‚Ä‚¢‚½)
                 # third_y, forth_direction, fifth_x
                 self.skip_drop = [action[2], action[3], action[4]]
                 # debug
@@ -1721,303 +1857,335 @@ class Block_Controller(object):
                     print("Move Down: ", "(", action[0], ",", action[2], ")")
 
             ##########
-            # å­¦ç¿’çµ‚äº†å‡¦ç†
+            # ŠwKI—¹ˆ—
             ##########
-            # 1ã‚²ãƒ¼ãƒ (EPOCH)ã®ä¸Šé™ãƒ†ãƒˆãƒªãƒŸãƒæ•°ã‚’è¶…ãˆãŸã‚‰ãƒªã‚»ãƒƒãƒˆãƒ•ãƒ©ã‚°ã‚’ç«‹ã¦ã‚‹
+            # 1ƒQ[ƒ€(EPOCH)‚ÌãŒÀƒeƒgƒŠƒ~ƒm”‚ğ’´‚¦‚½‚çƒŠƒZƒbƒgƒtƒ‰ƒO‚ğ—§‚Ä‚é
             if self.tetrominoes > self.max_tetrominoes:
                 nextMove["option"]["force_reset_field"] = True
-            # STATE = next_state ä»£å…¥
+            # STATE = next_state ‘ã“ü
             self.state = next_state
 
         ###############################################
         ###############################################
-        # æ¨è«– ã®å ´åˆ
+        # „˜_ ‚Ìê‡
         ###############################################
         ###############################################
         elif self.mode == "predict" or self.mode == "predict_sample":
             ##############
-            # model åˆ‡ã‚Šæ›¿ãˆ
+            # model Ø‚è‘Ö‚¦
             if self.weight2_available:
-                #ãƒœãƒ¼ãƒ‰ã‚’ï¼’æ¬¡å…ƒåŒ–
+                # ƒ{[ƒh‚ğ‚QŸŒ³‰»
                 reshape_board = self.get_reshape_backboard(curr_backboard)
-                ## æœ€ã‚‚é«˜ã„ç©´ã®ä½ç½®ã‚’æ±‚ã‚ã‚‹
-                _ , _ , max_highest_hole = self.get_holes(reshape_board, -1)
-                ## model2 åˆ‡ã‚Šæ›¿ãˆæ¡ä»¶
+                # Å‚à‚‚¢ŒŠ‚ÌˆÊ’u‚ğ‹‚ß‚é
+                _, _, max_highest_hole = self.get_holes(reshape_board, -1)
+                # model2 Ø‚è‘Ö‚¦ğŒ
                 if max_highest_hole < self.predict_weight2_enable_index:
                     self.weight2_enable = True
-                ## model1 åˆ‡ã‚Šæ›¿ãˆæ¡ä»¶
+                # model1 Ø‚è‘Ö‚¦ğŒ
                 if max_highest_hole > self.predict_weight2_disable_index:
                     self.weight2_enable = False
 
-                #debug
-                print (GameStatus["judge_info"]["block_index"], self.weight2_enable, max_highest_hole)
-
+                # debug
+                print(GameStatus["judge_info"]["block_index"],
+                      self.weight2_enable, max_highest_hole)
 
             ##############
-            # model æŒ‡å®š
+            # model w’è
             predict_model = self.model
             if self.weight2_enable:
                 predict_model = self.model2
 
-            #æ¨è«–ãƒ¢ãƒ¼ãƒ‰ã«åˆ‡ã‚Šæ›¿ãˆ
+            # „˜_ƒ‚[ƒh‚ÉØ‚è‘Ö‚¦
             predict_model.eval()
 
-            # æ¬¡ã®ãƒ†ãƒˆãƒªãƒŸãƒäºˆæ¸¬
+            # Ÿ‚ÌƒeƒgƒŠƒ~ƒm—\‘ª
             if self.predict_next_num > 0:
-                # index_list [1ç•ªç›®index, 2ç•ªç›®index, 3ç•ªç›®index ...] => q
-                index_list = []
-                # index_list_to_q (1ç•ªç›®index, 2ç•ªç›®index, 3ç•ªç›®index ...) => q
-                index_list_to_q = {}
-                ######################
-                # æ¬¡ã®äºˆæ¸¬ã‚’ä¸Šä½predict_next_stepsã¤å®Ÿæ–½, 1ç•ªç›®ã‹ã‚‰predict_next_numç•ªç›®ã¾ã§äºˆæ¸¬
-                index_list, index_list_to_q, next_actions, next_states \
-                            = self.get_predictions(predict_model, False, GameStatus, next_steps, self.predict_next_steps, 
-                                1, self.predict_next_num, index_list, index_list_to_q, -60000)
-                #print(index_list_to_q)
-                #print("max")
 
-                # å…¨äºˆæ¸¬ã®æœ€å¤§ q
+                # index_list [1”Ô–Úindex, 2”Ô–Úindex, 3”Ô–Úindex ...] => q
+                index_list = []
+                hold_index_list = []
+                # index_list_to_q (1”Ô–Úindex, 2”Ô–Úindex, 3”Ô–Úindex ...) => q
+                index_list_to_q = {}
+                hold_index_list_to_q = {}
+                ######################
+                # Ÿ‚Ì—\‘ª‚ğãˆÊpredict_next_steps_train‚ÂÀ{, 1”Ô–Ú‚©‚çpredict_next_num_train”Ô–Ú‚Ü‚Å—\‘ª
+                index_list, index_list_to_q, next_actions, next_states\
+                    = self.get_predictions(self.model, True, GameStatus, next_steps, self.predict_next_steps_train, 1, self.predict_next_num_train, index_list, index_list_to_q, -60000)
+                # print(index_list_to_q)
+                # print("max")
+                hold_index_list, hold_index_list_to_q, hold_next_actions, hold_next_states\
+                    = self.get_predictions(self.model, True, GameStatus, hold_steps, self.predict_next_steps_train, 1, self.predict_next_num_train, hold_index_list, hold_index_list_to_q, -60000)
+
+                # ‘S—\‘ª‚ÌÅ‘å q
                 max_index_list = max(index_list_to_q, key=index_list_to_q.get)
-                #print(max(index_list_to_q, key=index_list_to_q.get))
-                #print(max_index_list[0].item())
-                #print("============================")
-                # 1æ‰‹ç›®ã® index å…¥æ‰‹
+                hold_max_index_list = max(
+                    hold_index_list_to_q, key=hold_index_list_to_q.get)
+
+                # ƒz[ƒ‹ƒh‚µ‚½‚Ù‚¤‚ªQ’l‚ª—Ç‚©‚Á‚½‚Æ‚«‚Í•Ï”‚ğƒz[ƒ‹ƒh‚Ìê‡‚É‘“ü‚ê‘Ö‚¦‚·‚é
+                # ˆê“x–Ú‚Ìƒz[ƒ‹ƒh‚Ìê‡‚Íaction‚Í–³‹‚³‚êŸ‚Ìƒ^[ƒ“‚Æ‚È‚èA“ñ“x–ÚˆÈ~‚Ìƒz[ƒ‹ƒh‚Ìê‡‚Íƒz[ƒ‹ƒh‚³‚ê‚Ä‚¢‚½ƒ~ƒm‚Ì“®ì‚ğaction‚ÉŠi”[‚·‚é
+                if index_list_to_q[tuple(max_index_list)] < hold_index_list_to_q[tuple(hold_max_index_list)]:
+                    nextMove["strategy"]["use_hold_function"] = "y"
+                    next_steps = hold_steps
+                    index_list = hold_index_list
+                    index_list_to_q = hold_index_list_to_q
+                    next_actions = hold_next_actions
+                    next_states = hold_next_states
+                    max_index_list = hold_max_index_list
+
+                # print(max(index_list_to_q, key=index_list_to_q.get))
+                # print(max_index_list[0].item())
+                # print("============================")
+                # 1è–Ú‚Ì index “üè
                 index = max_index_list[0].item()
 
             else:
-                ### ç”»é¢ãƒœãƒ¼ãƒ‰ã®æ¬¡ã®çŠ¶æ…‹ä¸€è¦§ã‚’ action ã¨ states ã«ã‚ã‘ã€states ã‚’é€£çµ
+                # ‰æ–Êƒ{[ƒh‚ÌŸ‚Ìó‘Ôˆê——‚ğ action ‚Æ states ‚É‚í‚¯Astates ‚ğ˜AŒ‹
                 next_actions, next_states = zip(*next_steps.items())
+                hold_next_actions, hold_next_states = zip(*hold_steps.items())
                 next_states = torch.stack(next_states)
-                ## é †ä¼æ¬ã— Q å€¤ã‚’å–å¾— (model ã® __call__ â‰’ forward)
-                predictions = predict_model(next_states)[:, 0]
-                ## æœ€å¤§å€¤ã® index å–å¾—
-                index = torch.argmax(predictions).item()
+                hold_next_states = torch.stack(hold_next_states)
 
-            # æ¬¡ã® action ã‚’ index ã‚’å…ƒã«æ±ºå®š
-            # 0: 2ç•ªç›® Xè»¸ç§»å‹•
-            # 1: 1ç•ªç›® ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢
-            # 2: 3ç•ªç›® Yè»¸é™ä¸‹ (-1: ã§ Drop)
-            # 3: 4ç•ªç›® ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢ (Next Turn)
-            # 4: 5ç•ªç›® Xè»¸ç§»å‹• (Next Turn)
+                # ‡“`”À‚µ Q ’l‚ğæ“¾ (model ‚Ì __call__ à forward)
+                predictions = predict_model(next_states)[:, 0]
+                hold_predictions = predict_model(hold_next_states)[:, 0]
+
+                if max(predictions) < max(hold_predictions):
+                    nextMove["strategy"]["use_hold_function"] = "y"
+                    next_steps = hold_steps
+                    next_actions = hold_next_actions
+                    next_states = hold_next_states
+                    predictions = hold_predictions
+
+            # Ÿ‚Ì action ‚ğ index ‚ğŒ³‚ÉŒˆ’è
+            # 0: 2”Ô–Ú X²ˆÚ“®
+            # 1: 1”Ô–Ú ƒeƒgƒŠƒ~ƒm‰ñ“]
+            # 2: 3”Ô–Ú Y²~‰º (-1: ‚Å Drop)
+            # 3: 4”Ô–Ú ƒeƒgƒŠƒ~ƒm‰ñ“] (Next Turn)
+            # 4: 5”Ô–Ú X²ˆÚ“® (Next Turn)
             action = next_actions[index]
 
             ###############################################
-            ## æ¨è«–æ™‚ æ¬¡ã®å‹•ä½œæŒ‡å®š
+            # „˜_ Ÿ‚Ì“®ìw’è
             ###############################################
-            ## å‰ã®ã‚¿ãƒ¼ãƒ³ã§ Drop ã‚’ã‚¹ã‚­ãƒƒãƒ—ã—ã¦ã„ãŸã‹ï¼Ÿ (-1: ã—ã¦ã„ãªã„, ãã‚Œä»¥å¤–: ã—ã¦ã„ãŸ)
+            # ‘O‚Ìƒ^[ƒ“‚Å Drop ‚ğƒXƒLƒbƒv‚µ‚Ä‚¢‚½‚©H (-1: ‚µ‚Ä‚¢‚È‚¢, ‚»‚êˆÈŠO: ‚µ‚Ä‚¢‚½)
             # third_y, forth_direction, fifth_x
-            #self.skip_drop = [-1, -1, -1]
-            # ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢
+            # self.skip_drop = [-1, -1, -1]
+            # ƒeƒgƒŠƒ~ƒm‰ñ“]
             nextMove["strategy"]["direction"] = action[1]
-            # æ¨ªæ–¹å‘
+            # ‰¡•ûŒü
             nextMove["strategy"]["x"] = action[0]
             ###########
-            # Drop Down è½ä¸‹ã®å ´åˆ
+            # Drop Down —‰º‚Ìê‡
             if action[2] == -1 and action[3] == -1 and action[4] == -1:
-                # Drop Down è½ä¸‹
+                # Drop Down —‰º
                 nextMove["strategy"]["y_operation"] = 1
-                # Move Down é™ä¸‹æ•°
+                # Move Down ~‰º”
                 nextMove["strategy"]["y_moveblocknum"] = 1
-                # å‰ã®ã‚¿ãƒ¼ãƒ³ã§ Drop ã‚’ã‚¹ã‚­ãƒƒãƒ—ã—ã¦ã„ãŸã‹ï¼Ÿ (-1: ã—ã¦ã„ãªã„, ãã‚Œä»¥å¤–: ã—ã¦ã„ãŸ)
+                # ‘O‚Ìƒ^[ƒ“‚Å Drop ‚ğƒXƒLƒbƒv‚µ‚Ä‚¢‚½‚©H (-1: ‚µ‚Ä‚¢‚È‚¢, ‚»‚êˆÈŠO: ‚µ‚Ä‚¢‚½)
                 self.skip_drop = [-1, -1, -1]
             ###########
-            # Move Down é™ä¸‹ã®å ´åˆ
+            # Move Down ~‰º‚Ìê‡
             else:
-                # Move Down é™ä¸‹
+                # Move Down ~‰º
                 nextMove["strategy"]["y_operation"] = 0
-                # Move Down é™ä¸‹ æ•°
+                # Move Down ~‰º ”
                 nextMove["strategy"]["y_moveblocknum"] = action[2]
-                # å‰ã®ã‚¿ãƒ¼ãƒ³ã§ Drop ã‚’ã‚¹ã‚­ãƒƒãƒ—ã—ã¦ã„ãŸã‹ï¼Ÿ (-1: ã—ã¦ã„ãªã„, ãã‚Œä»¥å¤–: ã—ã¦ã„ãŸ)
+                # ‘O‚Ìƒ^[ƒ“‚Å Drop ‚ğƒXƒLƒbƒv‚µ‚Ä‚¢‚½‚©H (-1: ‚µ‚Ä‚¢‚È‚¢, ‚»‚êˆÈŠO: ‚µ‚Ä‚¢‚½)
                 # third_y, forth_direction, fifth_x
                 self.skip_drop = [action[2], action[3], action[4]]
                 # debug
                 if self.debug_flag_move_down == 1:
                     print("Move Down: ", "(", action[0], ",", action[2], ")")
-        ## çµ‚äº†æ™‚åˆ»
+        # I—¹
         if self.time_disp:
             print(datetime.now()-t1)
-        ## çµ‚äº†
+        # I—¹
         return nextMove
 
     ####################################
-    # ãƒ†ãƒˆãƒªãƒŸãƒã®äºˆå‘Šã«å¯¾ã—ã¦æ¬¡ã®çŠ¶æ…‹ãƒªã‚¹ãƒˆã‚’Top num_stepså€‹å–å¾—
-    # self: 
-    # predict_model: ãƒ¢ãƒ‡ãƒ«æŒ‡å®š
-    # is_train: å­¦ç¿’ãƒ¢ãƒ¼ãƒ‰çŠ¶æ…‹ã®å ´åˆ (no_gradã«ã™ã‚‹ãŸã‚)
+    # ƒeƒgƒŠƒ~ƒm‚Ì—\‚É‘Î‚µ‚ÄŸ‚Ìó‘ÔƒŠƒXƒg‚ğTop num_stepsŒÂæ“¾
+    # self:
+    # predict_model: ƒ‚ƒfƒ‹w’è
+    # is_train: ŠwKƒ‚[ƒhó‘Ô‚Ìê‡ (no_grad‚É‚·‚é‚½‚ß)
     # GameStatus: GameStatus
-    # prev_steps: å‰ã®æ‰‹ç•ªã®å€™è£œæ‰‹ãƒªã‚¹ãƒˆ
-    # num_steps: 1ã¤ã®æ‰‹ç•ªã§å€™è£œæ‰‹ã‚’ã„ãã¤æ¢ã™ã‹
-    # next_order: ã„ãã¤å…ˆã®æ‰‹ç•ªã‹
-    # left: ä½•ç•ªç›®ã®æ‰‹ç•ªã¾ã§æ¢ç´¢ã™ã‚‹ã‹
-    # index_list: æ‰‹ç•ªã”ã¨ã®indexãƒªã‚¹ãƒˆ
-    # index_list_to_q: æ‰‹ç•ªã”ã¨ã®indexãƒªã‚¹ãƒˆã‹ã‚‰ Q å€¤ã¸ã®å¤‰æ›
+    # prev_steps: ‘O‚Ìè”Ô‚ÌŒó•âèƒŠƒXƒg
+    # num_steps: 1‚Â‚Ìè”Ô‚ÅŒó•âè‚ğ‚¢‚­‚Â’T‚·‚©
+    # next_order: ‚¢‚­‚Âæ‚Ìè”Ô‚©
+    # left: ‰½”Ô–Ú‚Ìè”Ô‚Ü‚Å’Tõ‚·‚é‚©
+    # index_list: è”Ô‚²‚Æ‚ÌindexƒŠƒXƒg
+    # index_list_to_q: è”Ô‚²‚Æ‚ÌindexƒŠƒXƒg‚©‚ç Q ’l‚Ö‚Ì•ÏŠ·
     ####################################
     def get_predictions(self, predict_model, is_train, GameStatus, prev_steps, num_steps, next_order, left, index_list, index_list_to_q, highest_q):
-        ## æ¬¡ã®äºˆæ¸¬ä¸€è¦§
+        # Ÿ‚Ì—\‘ªˆê——
         next_predictions = []
-        ## index_list è¤‡è£½
+        # index_list •¡»
         new_index_list = []
 
-        ## äºˆæ¸¬ã®ç”»é¢ãƒœãƒ¼ãƒ‰
-        #next_predict_backboard = []
+        # —\‘ª‚Ì‰æ–Êƒ{[ƒh
+        # next_predict_backboard = []
 
-        # ç”»é¢ãƒœãƒ¼ãƒ‰ã®æ¬¡ã®çŠ¶æ…‹ä¸€è¦§ã‚’ action ã¨ states ã«ã‚ã‘ã€states ã‚’é€£çµ
+        # ‰æ–Êƒ{[ƒh‚ÌŸ‚Ìó‘Ôˆê——‚ğ action ‚Æ states ‚É‚í‚¯Astates ‚ğ˜AŒ‹
         next_actions, next_states = zip(*prev_steps.items())
         next_states = torch.stack(next_states)
-        # å­¦ç¿’ãƒ¢ãƒ¼ãƒ‰ã®å ´åˆ
+        # ŠwKƒ‚[ƒh‚Ìê‡
         if is_train:
-            ## GPU ä½¿ç”¨ã§ãã‚‹ã¨ãã¯ä½¿ã†
-#            if torch.cuda.is_available():
-#                next_states = next_states.cuda()
-            # ãƒ†ãƒ³ã‚½ãƒ«ã®å‹¾é…ã®è¨ˆç®—ã‚’ä¸å¯ã¨ã™ã‚‹
+            # GPU g—p‚Å‚«‚é‚Æ‚«‚Íg‚¤
+            #            if torch.cuda.is_available():
+            #                next_states = next_states.cuda()
+            # ƒeƒ“ƒ\ƒ‹‚ÌŒù”z‚ÌŒvZ‚ğ•s‰Â‚Æ‚·‚é
             with torch.no_grad():
-                # é †ä¼æ¬ã— Q å€¤ã‚’å–å¾— (model ã® __call__ â‰’ forward)
+                # ‡“`”À‚µ Q ’l‚ğæ“¾ (model ‚Ì __call__ à forward)
                 predictions = predict_model(next_states)[:, 0]
-        # æ¨è«–ãƒ¢ãƒ¼ãƒ‰ã®å ´åˆ
+        # „˜_ƒ‚[ƒh‚Ìê‡
         else:
-            # é †ä¼æ¬ã— Q å€¤ã‚’å–å¾— (model ã® __call__ â‰’ forward)
+            # ‡“`”À‚µ Q ’l‚ğæ“¾ (model ‚Ì __call__ à forward)
             predictions = predict_model(next_states)[:, 0]
 
-        ## num_steps ç•ªç›®ã¾ã§ Top ã® index å–å¾—
+        # num_steps ”Ô–Ú‚Ü‚Å Top ‚Ì index æ“¾
         top_indices = torch.topk(predictions, num_steps).indices
 
-        # å†å¸°æ¢ç´¢
+        # Ä‹A’Tõ
         if next_order < left:
-            ## äºˆæ¸¬ã®ç”»é¢ãƒœãƒ¼ãƒ‰å–å¾—
-            #predict_order = 0
+            # —\‘ª‚Ì‰æ–Êƒ{[ƒhæ“¾
+            # predict_order = 0
             for index in top_indices:
-                # index_list ã«è¿½åŠ 
+                # index_list ‚É’Ç‰Á
                 new_index_list = index_list.copy()
                 new_index_list.append(index)
-                # Q å€¤æ¯”è¼ƒ
+                # Q ’l”äŠr
                 now_q = predictions[index].item()
                 if now_q > highest_q:
-                    # æœ€é«˜å€¤ã¨ã™ã‚‹
+                    # Å‚’l‚Æ‚·‚é
                     highest_q = now_q
 
-                # æ¬¡ã®ç”»é¢ãƒœãƒ¼ãƒ‰ (torch) ã‚’ã²ã£ã±ã£ã¦ãã‚‹
+                # Ÿ‚Ì‰æ–Êƒ{[ƒh (torch) ‚ğ‚Ğ‚Á‚Ï‚Á‚Ä‚­‚é
                 next_state = next_states[index, :]
-                #print(next_order, ":", next_state)
-                # Numpy ã«å¤‰æ›ã— int ã«ã—ã¦ã€1æ¬¡å…ƒåŒ–
-                #next_predict_backboard.append(np.ravel(next_state.numpy().astype(int)))
-                #print(predict_order,":", next_predict_backboard[predict_order])
-        
-                # æ¬¡ã®äºˆæƒ³æ‰‹ãƒªã‚¹ãƒˆ
-                # next_state Numpy ã«å¤‰æ›ã— int ã«ã—ã¦ã€1æ¬¡å…ƒåŒ–
-                next_steps = self.get_next_func( np.ravel(next_state.numpy().astype(int)),
-                                     GameStatus["block_info"]["nextShapeList"]["element"+str(next_order)]["index"],
-                                     GameStatus["block_info"]["nextShapeList"]["element"+str(next_order)]["class"]) 
-                #GameStatus["block_info"]["nextShapeList"]["element"+str(1)]["direction_range"]
-    
-                ## æ¬¡ã®äºˆæ¸¬ã‚’ä¸Šä½ num_steps å®Ÿæ–½, next_order ç•ªç›®ã‹ã‚‰ left ç•ªç›®ã¾ã§äºˆæ¸¬
-                new_index_list, index_list_to_q, new_next_actions, new_next_states \
-                                = self.get_predictions(predict_model, is_train, GameStatus, 
-                                    next_steps, num_steps, next_order+1, left, new_index_list, index_list_to_q, highest_q)
-                # æ¬¡ã®ã‚«ã‚¦ãƒ³ãƒˆ
-                #predict_order += 1
-        # å†å¸°çµ‚äº†
+                # print(next_order, ":", next_state)
+                # Numpy ‚É•ÏŠ·‚µ int ‚É‚µ‚ÄA1ŸŒ³‰»
+                # next_predict_backboard.append(np.ravel(next_state.numpy().astype(int)))
+                # print(predict_order,":", next_predict_backboard[predict_order])
+
+                # Ÿ‚Ì—\‘zèƒŠƒXƒg
+                # next_state Numpy ‚É•ÏŠ·‚µ int ‚É‚µ‚ÄA1ŸŒ³‰»
+                next_steps = self.get_next_func(np.ravel(next_state.numpy().astype(int)),
+                                                GameStatus["block_info"]["nextShapeList"]["element"+str(
+                                                    next_order)]["index"],
+                                                GameStatus["block_info"]["nextShapeList"]["element"+str(next_order)]["class"])
+                # GameStatus["block_info"]["nextShapeList"]["element"+str(1)]["direction_range"]
+
+                # Ÿ‚Ì—\‘ª‚ğãˆÊ num_steps À{, next_order ”Ô–Ú‚©‚ç left ”Ô–Ú‚Ü‚Å—\‘ª
+                new_index_list, index_list_to_q, new_next_actions, new_next_states\
+                    = self.get_predictions(predict_model, is_train, GameStatus,
+                                           next_steps, num_steps, next_order+1, left, new_index_list, index_list_to_q, highest_q)
+                # Ÿ‚ÌƒJƒEƒ“ƒg
+                # predict_order += 1
+        # Ä‹AI—¹
         else:
-            # Top ã®ã¿ index_list ã«è¿½åŠ 
+            # Top ‚Ì‚İ index_list ‚É’Ç‰Á
             new_index_list = index_list.copy()
             new_index_list.append(top_indices[0])
-            # Q å€¤æ¯”è¼ƒ
+            # Q ’l”äŠr
             now_q = predictions[top_indices[0]].item()
             if now_q > highest_q:
-                # æœ€é«˜å€¤ã¨ã™ã‚‹
+                # Å‚’l‚Æ‚·‚é
                 highest_q = now_q
-            # index_list ã‹ã‚‰ q å€¤ã¸ã®è¾æ›¸ã‚’ã¤ãã‚‹
-            #print (new_index_list, highest_q, now_q)
+            # index_list ‚©‚ç q ’l‚Ö‚Ì«‘‚ğ‚Â‚­‚é
+            # print (new_index_list, highest_q, now_q)
             index_list_to_q[tuple(new_index_list)] = highest_q
 
-
-        ## æ¬¡ã®äºˆæ¸¬ä¸€è¦§ã¨Qå€¤, ãŠã‚ˆã³æœ€åˆã® action, state ã‚’è¿”ã™
+        # Ÿ‚Ì—\‘ªˆê——‚ÆQ’l, ‚¨‚æ‚ÑÅ‰‚Ì action, state ‚ğ•Ô‚·
         return new_index_list, index_list_to_q, next_actions, next_states
 
     ####################################
-    # ãƒ†ãƒˆãƒªãƒŸãƒãŒé…ç½®ã§ãã‚‹å·¦ç«¯ã¨å³ç«¯ã®åº§æ¨™ã‚’è¿”ã™
+    # ƒeƒgƒŠƒ~ƒm‚ª”z’u‚Å‚«‚é¶’[‚Æ‰E’[‚ÌÀ•W‚ğ•Ô‚·
     # self,
-    # Shape_class: ç¾åœ¨ã¨äºˆå‘Šãƒ†ãƒˆãƒªãƒŸãƒã®é…åˆ—
-    # direction: ç¾åœ¨ã®ãƒ†ãƒˆãƒªãƒŸãƒæ–¹å‘
+    # Shape_class: Œ»İ‚Æ—\ƒeƒgƒŠƒ~ƒm‚Ì”z—ñ
+    # direction: Œ»İ‚ÌƒeƒgƒŠƒ~ƒm•ûŒü
     ####################################
     def getSearchXRange(self, Shape_class, direction):
         #
         # get x range from shape direction.
         #
-        # ãƒ†ãƒˆãƒªãƒŸãƒãŒåŸç‚¹ã‹ã‚‰ x ä¸¡æ–¹å‘ã«æœ€å¤§ä½•ãƒã‚¹å æœ‰ã™ã‚‹ã®ã‹å–å¾—
-        minX, maxX, _, _ = Shape_class.getBoundingOffsets(direction) # get shape x offsets[minX,maxX] as relative value.
-        # å·¦æ–¹å‘ã®ã‚µã‚¤ã‚ºåˆ†
+        # ƒeƒgƒŠƒ~ƒm‚ªŒ´“_‚©‚ç x —¼•ûŒü‚ÉÅ‘å‰½ƒ}ƒXè—L‚·‚é‚Ì‚©æ“¾
+        # get shape x offsets[minX,maxX] as relative value.
+        minX, maxX, _, _ = Shape_class.getBoundingOffsets(direction)
+        # ¶•ûŒü‚ÌƒTƒCƒY•ª
         xMin = -1 * minX
-        # å³æ–¹å‘ã®ã‚µã‚¤ã‚ºåˆ†ï¼ˆç”»é¢ã‚µã‚¤ã‚ºã‹ã‚‰ã²ãï¼‰
+        # ‰E•ûŒü‚ÌƒTƒCƒY•ªi‰æ–ÊƒTƒCƒY‚©‚ç‚Ğ‚­j
         xMax = self.board_data_width - maxX
         return xMin, xMax
 
     ####################################
-    # direction (å›è»¢çŠ¶æ…‹)ã®ãƒ†ãƒˆãƒªãƒŸãƒåº§æ¨™é…åˆ—ã‚’å–å¾—ã—ã€ãã‚Œã‚’x,yã«é…ç½®ã—ãŸå ´åˆã®2æ¬¡å…ƒåº§æ¨™é…åˆ—ã‚’è¿”ã™
+    # direction (‰ñ“]ó‘Ô)‚ÌƒeƒgƒŠƒ~ƒmÀ•W”z—ñ‚ğæ“¾‚µA‚»‚ê‚ğx,y‚É”z’u‚µ‚½ê‡‚Ì2ŸŒ³À•W”z—ñ‚ğ•Ô‚·
     ####################################
     def getShapeCoordArray(self, Shape_class, direction, x, y):
         #
         # get coordinate array by given shape.
-        # direction (å›è»¢çŠ¶æ…‹)ã®ãƒ†ãƒˆãƒªãƒŸãƒåº§æ¨™é…åˆ—ã‚’å–å¾—ã—ã€ãã‚Œã‚’x,yã«é…ç½®ã—ãŸå ´åˆã®2æ¬¡å…ƒåº§æ¨™é…åˆ—ã‚’è¿”ã™
-        coordArray = Shape_class.getCoords(direction, x, y) # get array from shape direction, x, y.
+        # direction (‰ñ“]ó‘Ô)‚ÌƒeƒgƒŠƒ~ƒmÀ•W”z—ñ‚ğæ“¾‚µA‚»‚ê‚ğx,y‚É”z’u‚µ‚½ê‡‚Ì2ŸŒ³À•W”z—ñ‚ğ•Ô‚·
+        # get array from shape direction, x, y.
+        coordArray = Shape_class.getCoords(direction, x, y)
         return coordArray
 
     ####################################
-    # ç”»é¢ãƒœãƒ¼ãƒ‰ãƒ‡ãƒ¼ã‚¿ã‚’ã‚³ãƒ”ãƒ¼ã—ã¦æŒ‡å®šåº§æ¨™ã«ãƒ†ãƒˆãƒªãƒŸãƒã‚’é…ç½®ã—è½ä¸‹ã•ã›ãŸç”»é¢ãƒœãƒ¼ãƒ‰ã¨yåº§æ¨™ã‚’è¿”ã™
-    # board_backboard: ç¾çŠ¶ç”»é¢ãƒœãƒ¼ãƒ‰
-    # Shape_class: ãƒ†ãƒˆãƒªãƒŸãƒç¾/äºˆå‘Šãƒªã‚¹ãƒˆ
-    # direction: ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢æ–¹å‘
-    # center_x: ãƒ†ãƒˆãƒªãƒŸãƒxåº§æ¨™
-    # center_y: ãƒ†ãƒˆãƒªãƒŸãƒyåº§æ¨™
+    # ‰æ–Êƒ{[ƒhƒf[ƒ^‚ğƒRƒs[‚µ‚Äw’èÀ•W‚ÉƒeƒgƒŠƒ~ƒm‚ğ”z’u‚µ—‰º‚³‚¹‚½‰æ–Êƒ{[ƒh‚ÆyÀ•W‚ğ•Ô‚·
+    # board_backboard: Œ»ó‰æ–Êƒ{[ƒh
+    # Shape_class: ƒeƒgƒŠƒ~ƒmŒ»/—\ƒŠƒXƒg
+    # direction: ƒeƒgƒŠƒ~ƒm‰ñ“]•ûŒü
+    # center_x: ƒeƒgƒŠƒ~ƒmxÀ•W
+    # center_y: ƒeƒgƒŠƒ~ƒmyÀ•W
     ####################################
     def getBoard(self, board_backboard, Shape_class, direction, center_x, center_y):
-        # 
+        #
         # get new board.
         #
         # copy backboard data to make new board.
         # if not, original backboard data will be updated later.
         board = copy.deepcopy(board_backboard)
-        # æŒ‡å®šåº§æ¨™ã‹ã‚‰è½ä¸‹ã•ã›ãŸã¨ã“ã‚ã«ãƒ†ãƒˆãƒªãƒŸãƒã‚’å›ºå®šã—ãã®ç”»é¢ãƒœãƒ¼ãƒ‰ã‚’è¿”ã™
-        _board, drop_y = self.dropDown(board, Shape_class, direction, center_x, center_y)
+        # w’èÀ•W‚©‚ç—‰º‚³‚¹‚½‚Æ‚±‚ë‚ÉƒeƒgƒŠƒ~ƒm‚ğŒÅ’è‚µ‚»‚Ì‰æ–Êƒ{[ƒh‚ğ•Ô‚·
+        _board, drop_y = self.dropDown(
+            board, Shape_class, direction, center_x, center_y)
         return _board, drop_y
 
     ####################################
-    # æŒ‡å®šåº§æ¨™ã‹ã‚‰è½ä¸‹ã•ã›ãŸã¨ã“ã‚ã«ãƒ†ãƒˆãƒªãƒŸãƒã‚’å›ºå®šã—ãã®ç”»é¢ãƒœãƒ¼ãƒ‰ã‚’è¿”ã™
-    # board: ç¾çŠ¶ç”»é¢ãƒœãƒ¼ãƒ‰
-    # Shape_class: ãƒ†ãƒˆãƒªãƒŸãƒç¾/äºˆå‘Šãƒªã‚¹ãƒˆ
-    # direction: ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢æ–¹å‘
-    # center_x: ãƒ†ãƒˆãƒªãƒŸãƒxåº§æ¨™
-    # center_y: ãƒ†ãƒˆãƒªãƒŸãƒyåº§æ¨™ (-1: Drop æŒ‡å®š)
+    # w’èÀ•W‚©‚ç—‰º‚³‚¹‚½‚Æ‚±‚ë‚ÉƒeƒgƒŠƒ~ƒm‚ğŒÅ’è‚µ‚»‚Ì‰æ–Êƒ{[ƒh‚ğ•Ô‚·
+    # board: Œ»ó‰æ–Êƒ{[ƒh
+    # Shape_class: ƒeƒgƒŠƒ~ƒmŒ»/—\ƒŠƒXƒg
+    # direction: ƒeƒgƒŠƒ~ƒm‰ñ“]•ûŒü
+    # center_x: ƒeƒgƒŠƒ~ƒmxÀ•W
+    # center_y: ƒeƒgƒŠƒ~ƒmyÀ•W (-1: Drop w’è)
     ####################################
     def dropDown(self, board, Shape_class, direction, center_x, center_y):
-        # 
+        #
         # internal function of getBoard.
         # -- drop down the shape on the board.
         #
         ###############
-        ## Drop Down è½ä¸‹ã®å ´åˆ
+        # Drop Down —‰º‚Ìê‡
         if center_y == -1:
             center_y = 0
 
-        # ç”»é¢ãƒœãƒ¼ãƒ‰ä¸‹é™åº§æ¨™ã¨ã—ã¦ dy è¨­å®š
+        # ‰æ–Êƒ{[ƒh‰ºŒÀÀ•W‚Æ‚µ‚Ä dy İ’è
         dy = self.board_data_height - 1
-        # direction (å›è»¢çŠ¶æ…‹)ã®ãƒ†ãƒˆãƒªãƒŸãƒ2æ¬¡å…ƒåº§æ¨™é…åˆ—ã‚’å–å¾—ã—ã€ãã‚Œã‚’x,yã«é…ç½®ã—ãŸå ´åˆã®åº§æ¨™é…åˆ—ã‚’è¿”ã™
-        coordArray = self.getShapeCoordArray(Shape_class, direction, center_x, center_y)
+        # direction (‰ñ“]ó‘Ô)‚ÌƒeƒgƒŠƒ~ƒm2ŸŒ³À•W”z—ñ‚ğæ“¾‚µA‚»‚ê‚ğx,y‚É”z’u‚µ‚½ê‡‚ÌÀ•W”z—ñ‚ğ•Ô‚·
+        coordArray = self.getShapeCoordArray(
+            Shape_class, direction, center_x, center_y)
 
         # update dy
-        # ãƒ†ãƒˆãƒªãƒŸãƒåº§æ¨™é…åˆ—ã”ã¨ã«...
+        # ƒeƒgƒŠƒ~ƒmÀ•W”z—ñ‚²‚Æ‚É...
         for _x, _y in coordArray:
             _yy = 0
-            # _yy ã‚’ä¸€ã¤ãšã¤è½ã¨ã™ã“ã¨ã«ã‚ˆã‚Šãƒ–ãƒ­ãƒƒã‚¯ã®è½ä¸‹ä¸‹é™ã‚’ç¢ºèª
-            # _yy+ãƒ†ãƒˆãƒªãƒŸãƒåº§æ¨™y ãŒ ç”»é¢ä¸‹é™ã‚ˆã‚Šä¸Šã€€ã‹ã¤ã€€(_yy +ãƒ†ãƒˆãƒªãƒŸãƒåº§æ¨™yãŒç”»é¢ä¸Šé™ã‚ˆã‚Šä¸Š ã¾ãŸã¯ ãƒ†ãƒˆãƒªãƒŸãƒåº§æ¨™_x,_yy+ãƒ†ãƒˆãƒªãƒŸãƒåº§æ¨™_yã®ãƒ–ãƒ­ãƒƒã‚¯ãŒãªã„)
+            # _yy ‚ğˆê‚Â‚¸‚Â—‚Æ‚·‚±‚Æ‚É‚æ‚èƒuƒƒbƒN‚Ì—‰º‰ºŒÀ‚ğŠm”F
+            # _yy+ƒeƒgƒŠƒ~ƒmÀ•Wy ‚ª ‰æ–Ê‰ºŒÀ‚æ‚èã@‚©‚Â@(_yy +ƒeƒgƒŠƒ~ƒmÀ•Wy‚ª‰æ–ÊãŒÀ‚æ‚èã ‚Ü‚½‚Í ƒeƒgƒŠƒ~ƒmÀ•W_x,_yy+ƒeƒgƒŠƒ~ƒmÀ•W_y‚ÌƒuƒƒbƒN‚ª‚È‚¢)
             while _yy + _y < self.board_data_height and (_yy + _y < 0 or board[(_y + _yy) * self.board_data_width + _x] == self.ShapeNone_index):
-                #_yy ã‚’è¶³ã—ã¦ã„ã(ä¸‹ã’ã¦ã„ã)
+                # _yy ‚ğ‘«‚µ‚Ä‚¢‚­(‰º‚°‚Ä‚¢‚­)
                 _yy += 1
             _yy -= 1
-            # ä¸‹é™åº§æ¨™ dy /ä»Šã¾ã§ã®ä¸‹é™ã‚ˆã‚Šå°ã•ã„(é«˜ã„)ãªã‚‰ __yy ã‚’è½ä¸‹ä¸‹é™ã¨ã—ã¦è¨­å®š
+            # ‰ºŒÀÀ•W dy /¡‚Ü‚Å‚Ì‰ºŒÀ‚æ‚è¬‚³‚¢(‚‚¢)‚È‚ç __yy ‚ğ—‰º‰ºŒÀ‚Æ‚µ‚Äİ’è
             if _yy < dy:
                 dy = _yy
-        # dy: ãƒ†ãƒˆãƒªãƒŸãƒè½ä¸‹ä¸‹é™åº§æ¨™ã‚’æŒ‡å®š
-        _board = self.dropDownWithDy(board, Shape_class, direction, center_x, dy)
+        # dy: ƒeƒgƒŠƒ~ƒm—‰º‰ºŒÀÀ•W‚ğw’è
+        _board = self.dropDownWithDy(
+            board, Shape_class, direction, center_x, dy)
 
         # debug
         if self.debug_flag_drop_down == 1:
@@ -2026,24 +2194,28 @@ class Block_Controller(object):
         return _board, dy
 
     ####################################
-    # æŒ‡å®šä½ç½®ã«ãƒ†ãƒˆãƒªãƒŸãƒã‚’å›ºå®šã™ã‚‹
-    # board: ç¾çŠ¶ç”»é¢ãƒœãƒ¼ãƒ‰
-    # Shape_class: ãƒ†ãƒˆãƒªãƒŸãƒç¾/äºˆå‘Šãƒªã‚¹ãƒˆ
-    # direction: ãƒ†ãƒˆãƒªãƒŸãƒå›è»¢æ–¹å‘
-    # center_x: ãƒ†ãƒˆãƒªãƒŸãƒxåº§æ¨™
-    # center_y: ãƒ†ãƒˆãƒªãƒŸãƒyåº§æ¨™ã‚’æŒ‡å®š
+    # w’èˆÊ’u‚ÉƒeƒgƒŠƒ~ƒm‚ğŒÅ’è‚·‚é
+    # board: Œ»ó‰æ–Êƒ{[ƒh
+    # Shape_class: ƒeƒgƒŠƒ~ƒmŒ»/—\ƒŠƒXƒg
+    # direction: ƒeƒgƒŠƒ~ƒm‰ñ“]•ûŒü
+    # center_x: ƒeƒgƒŠƒ~ƒmxÀ•W
+    # center_y: ƒeƒgƒŠƒ~ƒmyÀ•W‚ğw’è
     ####################################
     def dropDownWithDy(self, board, Shape_class, direction, center_x, center_y):
         #
         # internal function of dropDown.
         #
-        # board ã‚³ãƒ”ãƒ¼
+        # board ƒRƒs[
         _board = board
-        # direction (å›è»¢çŠ¶æ…‹)ã®ãƒ†ãƒˆãƒªãƒŸãƒ2æ¬¡å…ƒåº§æ¨™é…åˆ—ã‚’å–å¾—ã—ã€ãã‚Œã‚’x,yã«é…ç½®ã—ãŸå ´åˆã®åº§æ¨™é…åˆ—ã‚’è¿”ã™
-        coordArray = self.getShapeCoordArray(Shape_class, direction, center_x, 0)
-        # ãƒ†ãƒˆãƒªãƒŸãƒåº§æ¨™é…åˆ—ã‚’é †ã«é€²ã‚ã‚‹
+        # direction (‰ñ“]ó‘Ô)‚ÌƒeƒgƒŠƒ~ƒm2ŸŒ³À•W”z—ñ‚ğæ“¾‚µA‚»‚ê‚ğx,y‚É”z’u‚µ‚½ê‡‚ÌÀ•W”z—ñ‚ğ•Ô‚·
+        coordArray = self.getShapeCoordArray(
+            Shape_class, direction, center_x, 0)
+        # ƒeƒgƒŠƒ~ƒmÀ•W”z—ñ‚ğ‡‚Éi‚ß‚é
         for _x, _y in coordArray:
-            #center_x, center_y ã® ç”»é¢ãƒœãƒ¼ãƒ‰ã«ãƒ–ãƒ­ãƒƒã‚¯ã‚’é…ç½®ã—ã¦ã€ãã®ç”»é¢ãƒœãƒ¼ãƒ‰ãƒ‡ãƒ¼ã‚¿ã‚’è¿”ã™
-            _board[(_y + center_y) * self.board_data_width + _x] = Shape_class.shape
+            # center_x, center_y ‚Ì ‰æ–Êƒ{[ƒh‚ÉƒuƒƒbƒN‚ğ”z’u‚µ‚ÄA‚»‚Ì‰æ–Êƒ{[ƒhƒf[ƒ^‚ğ•Ô‚·
+            _board[(_y + center_y) * self.board_data_width +
+                   _x] = Shape_class.shape
         return _board
+
+
 BLOCK_CONTROLLER_TRAIN = Block_Controller()
