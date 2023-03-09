@@ -69,7 +69,7 @@ class Shape(object):
     # テトリミノ形状を回転した座標を返す
     # direction: テトリミノ回転方向
     ##############################
-    def getRotatedOffsets(self, direction):
+    def getRotatedOffsets(self, direction): #■  4つのブロックの位置座標を返す。
         # テトリミノ形状座標タプルを取得
         tmpCoords = Shape.shapeCoord[self.shape]
         # 方向によってテトリミノ形状座標タプルを回転させる
@@ -86,7 +86,7 @@ class Shape(object):
                 return ((-x, -y) for x, y in tmpCoords)
 
         if direction == 3:
-            if self.shape in (Shape.shapeI, Shape.shapeZ, Shape.shapeS):
+            if self.shape in (Shape.shapeI, Shape.shapeZ, Shape.shapeS):    #■  この場合分けは意味があるのか？高速化に寄与しない気がする。
                 return ((-y, x) for x, y in tmpCoords)
             else:
                 return ((y, -x) for x, y in tmpCoords)

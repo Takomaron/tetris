@@ -932,7 +932,7 @@ class Block_Controller(object):
     ####################################
     # 左端以外埋まっているか？
     ####################################
-    def get_tetris_fill_reward(self, reshape_board):
+    def get_tetris_fill_reward(self, reshape_board, piece_id):
         # 無効の場合
         if self.tetris_fill_height == 0:
             return 0
@@ -954,6 +954,16 @@ class Block_Controller(object):
             # 1段目は2倍
             if i == 1:
                 reward += 5
+
+        # テトリミノごとに報酬を調整
+        if piece_id == 5:  # O piece => 1
+            reward += 0
+        elif piece_id == 6 or piece_id == 7:  # I, S, Z piece => 1
+            reward += 0
+        elif piece_id == 1:  # I => 倍にする
+            reward *= 2
+        else:  # the others => 1
+            reward += 0
 
         return reward
 
@@ -1366,8 +1376,9 @@ class Block_Controller(object):
     ####################################
     # 報酬を計算(2次元用)
     # reward_func から呼び出される
+    # ホールド中のテトリミノ形状も報酬計算に使用する。
     ####################################
-    def step_v2(self, curr_backboard, action, curr_shape_class):
+    def step_v2(self, curr_backboard, action, curr_shape_class, hold_shape_id):
         # 次の action を index を元に決定
         # 0: 2番目 X軸移動
         # 1: 1番目 テトリミノ回転
@@ -1389,9 +1400,12 @@ class Block_Controller(object):
         hole_num, hole_top_penalty, max_highest_hole = self.get_holes(
             reshape_board, min_height)
         # 左端あけた形状の報酬計算
-        tetris_reward = self.get_tetris_fill_reward(reshape_board)
+        tetris_reward = self.get_tetris_fill_reward(reshape_board, hold_shape_id)
         # 消せるセルの確認
         lines_cleared, reshape_board = self.check_cleared_rows(reshape_board)
+        
+        ## ホールドしているテトリミノ計上の報酬計算　と思ったが、保持しているものがI型の時の左端開けた場合の報酬を上げるようにする。
+        
         # 報酬の計算
         reward = self.reward_list[lines_cleared] * \
             (1 + (self.height - max(0, max_height))/self.height_line_reward)
@@ -1536,19 +1550,16 @@ class Block_Controller(object):
         #    Key = Tuple (テトリミノ画面ボードX座標, テトリミノ回転状態)
         #                 テトリミノ Move Down 降下 数, テトリミノ追加移動X座標, テトリミノ追加回転)
         #    Value = 画面ボード状態
-        next_steps = self.get_next_func(
-            curr_backboard, curr_piece_id, curr_shape_class)
+        next_steps = self.get_next_func(curr_backboard, curr_piece_id, curr_shape_class)
 
         # holdを使った場合のパターン
         if hold_piece_id == None:
             # 初めてのholdの場合
-            hold_steps = self.get_next_func(
-                curr_backboard, next_piece_id, next_shape_class)
+            hold_steps = self.get_next_func(curr_backboard, next_piece_id, next_shape_class)
         else:
             # 2回目以降の場合
             # print(hold_piece_id)
-            hold_steps = self.get_next_func(
-                curr_backboard, hold_piece_id, hold_shape_class)
+            hold_steps = self.get_next_func(curr_backboard, hold_piece_id, hold_shape_class)
         # print (len(next_steps), end='=>')
 
         ###############################################
@@ -1590,8 +1601,7 @@ class Block_Controller(object):
 
                 # 全予測の最大 q
                 max_index_list = max(index_list_to_q, key=index_list_to_q.get)
-                hold_max_index_list = max(
-                    hold_index_list_to_q, key=hold_index_list_to_q.get)
+                hold_max_index_list = max(hold_index_list_to_q, key=hold_index_list_to_q.get)
 
                 # ホールドしたほうがQ値が良かったときは変数をホールドの場合に総入れ替えする
                 # 一度目のホールドの場合はactionは無視され次のターンとなり、二度目以降のホールドの場合はホールドされていたミノの動作をactionに格納する
@@ -1671,15 +1681,12 @@ class Block_Controller(object):
             action = next_actions[index]
             # step, step_v2 により報酬計算
             if nextMove["strategy"]["use_hold_function"] == "y":
-                if hold_piece_id == None:
-                    # ターンを消費するのでちょっとだけよくない
-                    reward = -0.001
-                else:
-                    reward = self.reward_func(
-                        curr_backboard, action, hold_shape_class)
+              if hold_piece_id == None: # 初回hold
+                reward = 0  # holdは早めに実施されるようmax値を設定
+              else:
+                reward = self.step_v2(curr_backboard, action, hold_shape_class, curr_piece_id)
             else:
-                reward = self.reward_func(
-                    curr_backboard, action, curr_shape_class)
+              reward = self.step_v2(curr_backboard, action, curr_shape_class, hold_piece_id)
 
             done = False  # game over flag
 
