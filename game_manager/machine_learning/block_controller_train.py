@@ -441,9 +441,9 @@ class Block_Controller(object):
 
         self.score_list = cfg["tetris"]["score_list"]
         # 報酬読み込み
-        self.reward_list = cfg["train"]["reward_list"]
+        self.reward_list = cfg["train"]["reward_list"]  #消した行数に応じた報酬
         # Game Over 報酬 = Penalty
-        self.penalty = self.reward_list[5]
+        self.penalty = self.reward_list[5]  # ゲームオーバー時のペナルティ
 
         ########
         # 報酬を 1 で正規化、ただし消去報酬のみ...Q値の急激な変動抑制
@@ -795,6 +795,7 @@ class Block_Controller(object):
         max_height = np.max(heights)
         # 最も低いところをとる (返り値用)
         min_height = np.min(heights)
+        min_height_l = np.min(heights[1:])    #★ 左端以外で最小高さ
 
         # 右端列を削った 高さ配列
         # currs = heights[:-1]
@@ -812,7 +813,7 @@ class Block_Controller(object):
 
         # 差分の絶対値を合計してでこぼこ度とする
         total_bumpiness = np.sum(diffs)
-        return total_bumpiness, total_height, max_height, min_height, heights[0]
+        return total_bumpiness, total_height, max_height, min_height, heights[0], min_height_l
 
     ####################################
     # 穴の数, 穴の上積み上げ Penalty, 最も高い穴の位置を求める
@@ -876,7 +877,7 @@ class Block_Controller(object):
                             highest_grounds[i] >= highest_holes[i] + self.hole_top_limit:
                         hole_top_penalty += highest_grounds[i] - \
                             (highest_holes[i])
-            # 最も高い位置にある穴の数で割る
+            # 最も高い位置にある穴の数で割る・・・■穴の数じゃなくて高いところが開いている列の数だ。
             hole_top_penalty /= highest_hole_num
             # debug
             # print(['{:02}'.format(n) for n in highest_grounds])
@@ -895,8 +896,7 @@ class Block_Controller(object):
         # 穴の数
         holes, _, _ = self.get_holes(reshape_board, -1)
         # でこぼこの数
-        bumpiness, height, max_height, min_height, _ = self.get_bumpiness_and_height(
-            reshape_board)
+        bumpiness, height, max_height, min_height, _, _ = self.get_bumpiness_and_height(reshape_board)
 
         return torch.FloatTensor([lines_cleared, holes, bumpiness, height])
 
@@ -909,7 +909,7 @@ class Block_Controller(object):
         # 穴の数
         holes, _, _ = self.get_holes(reshape_board, -1)
         # でこぼこの数
-        bumpiness, height, max_row, min_height, _ = self.get_bumpiness_and_height(
+        bumpiness, height, max_row, min_height, _, _ = self.get_bumpiness_and_height(
             reshape_board)
         # 最大高さ
         # max_row = self.get_max_height(reshape_board)
@@ -939,6 +939,8 @@ class Block_Controller(object):
 
         # 報酬
         reward = 0
+        lines = 0   #連続して埋まっているライン数
+        max_reward = self.tetris_fill_height
         # ボード上で 0 でないもの(テトリミノのあるところ)を抽出
         # (0,1,2,3,4,5,6,7) を ブロックあり True, なし False に変更
         mask = reshape_board != 0
@@ -948,22 +950,16 @@ class Block_Controller(object):
 
         # line (1 - self.tetris_fill_height)段目の左端以外そろっているか
         for i in range(1, self.tetris_fill_height):
-            # そろっている段ごとに報酬
+            # そろっている段ごとに報酬。掛け算で低い行でたくさんそろっているのを報酬高く。
             if self.get_line_right_fill(reshape_board, sum_, i):
                 reward += 1
             # 1段目は2倍
             if i == 1:
                 reward += 5
 
-        # テトリミノごとに報酬を調整
-        if piece_id == 5:  # O piece => 1
-            reward += 0
-        elif piece_id == 6 or piece_id == 7:  # I, S, Z piece => 1
-            reward += 0
-        elif piece_id == 1:  # I => 倍にする
-            reward *= 2
-        else:  # the others => 1
-            reward += 0
+#        # ホールドしているテトリミノがIであれば、報酬を1行目と同じだけ足しこむ
+#        if piece_id == 1:  # I
+#            reward += 5
 
         return reward
 
@@ -1387,18 +1383,15 @@ class Block_Controller(object):
         # 4: 5番目 X軸移動 (Next Turn)
         x0, direction0, third_y, forth_direction, fifth_x = action
         # 画面ボードデータをコピーして指定座標にテトリミノを配置し落下させた画面ボードとy座標を返す
-        board, drop_y = self.getBoard(
-            curr_backboard, curr_shape_class, direction0, x0, -1)
+        board, drop_y = self.getBoard(curr_backboard, curr_shape_class, direction0, x0, -1)
         # ボードを２次元化
         reshape_board = self.get_reshape_backboard(board)
         # 報酬計算元の値取得
         # でこぼこ度, 高さ合計, 高さ最大, 高さ最小を求める
-        bampiness, total_height, max_height, min_height, left_side_height = self.get_bumpiness_and_height(
-            reshape_board)
+        bampiness, total_height, max_height, min_height, left_side_height, min_height_l = self.get_bumpiness_and_height(reshape_board)
         # max_height = self.get_max_height(reshape_board)
         # 穴の数, 穴の上積み上げ Penalty, 最も高い穴の位置を求める
-        hole_num, hole_top_penalty, max_highest_hole = self.get_holes(
-            reshape_board, min_height)
+        hole_num, hole_top_penalty, max_highest_hole = self.get_holes(reshape_board, min_height)
         # 左端あけた形状の報酬計算
         tetris_reward = self.get_tetris_fill_reward(reshape_board, hold_shape_id)
         # 消せるセルの確認
@@ -1407,8 +1400,12 @@ class Block_Controller(object):
         ## ホールドしているテトリミノ計上の報酬計算　と思ったが、保持しているものがI型の時の左端開けた場合の報酬を上げるようにする。
         
         # 報酬の計算
-        reward = self.reward_list[lines_cleared] * \
-            (1 + (self.height - max(0, max_height))/self.height_line_reward)
+        reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height))/self.height_line_reward)
+#       左端を除いた最低高さが4以下の場合は低い分だけペナルティ
+#        reward += min(0, (min_height_l - 4))/self.height_line_reward
+#       左端を除いた最低高さが4以下の場合は報酬を半分にする
+#        if min_height_l < 4:
+#            reward /= 2
         # 継続報酬
         # reward += 0.01
         # 形状の罰報酬
@@ -1425,8 +1422,7 @@ class Block_Controller(object):
         reward += tetris_reward * self.tetris_fill_reward
         # 左端が高すぎる場合の罰
         if left_side_height > self.bumpiness_left_side_relax:
-            reward -= (left_side_height - self.bumpiness_left_side_relax) * \
-                self.left_side_height_penalty
+            reward -= (left_side_height - self.bumpiness_left_side_relax) * self.left_side_height_penalty
 
         self.epoch_reward += reward
 
@@ -1446,13 +1442,11 @@ class Block_Controller(object):
     def step(self, curr_backboard, action, curr_shape_class):
         x0, direction0, third_y, forth_direction, fifth_x = action
         # 画面ボードデータをコピーして指定座標にテトリミノを配置し落下させた画面ボードとy座標を返す
-        board, drop_y = self.getBoard(
-            curr_backboard, curr_shape_class, direction0, x0, -1)
+        board, drop_y = self.getBoard(curr_backboard, curr_shape_class, direction0, x0, -1)
         # ボードを２次元化
         reshape_board = self.get_reshape_backboard(board)
         # 報酬計算元の値取得
-        bampiness, height, max_height, min_height, _ = self.get_bumpiness_and_height(
-            reshape_board)
+        bampiness, height, max_height, min_height, _, _ = self.get_bumpiness_and_height(reshape_board)
         # max_height = self.get_max_height(reshape_board)
         hole_num, _, _ = self.get_holes(reshape_board, min_height)
         lines_cleared, reshape_board = self.check_cleared_rows(reshape_board)
@@ -1598,7 +1592,7 @@ class Block_Controller(object):
                 # print("max")
                 hold_index_list, hold_index_list_to_q, hold_next_actions, hold_next_states \
                     = self.get_predictions(self.model, True, GameStatus, hold_steps, self.predict_next_steps_train, 1, self.predict_next_num_train, hold_index_list, hold_index_list_to_q, -60000)
-
+#★上のhold無しのメンバは問題ないのだろうか■
                 # 全予測の最大 q
                 max_index_list = max(index_list_to_q, key=index_list_to_q.get)
                 hold_max_index_list = max(hold_index_list_to_q, key=hold_index_list_to_q.get)
@@ -1701,15 +1695,12 @@ class Block_Controller(object):
                         next_backboard = curr_backboard
                         drop_y = 0  # とりあえず入れているだけ。使わないはず
                     else:
-                        next_backboard, drop_y = self.getBoard(
-                            curr_backboard, hold_shape_class, action[1], action[0], action[2])
+                        next_backboard, drop_y = self.getBoard(curr_backboard, hold_shape_class, action[1], action[0], action[2])
                 else:
-                    next_backboard, drop_y = self.getBoard(
-                        curr_backboard, curr_shape_class, action[1], action[0], action[2])
+                    next_backboard, drop_y = self.getBoard(curr_backboard, curr_shape_class, action[1], action[0], action[2])
 
                 # 画面ボードで テトリミノ回転状態 に落下させたときの次の状態一覧を作成
-                next2_steps = self.get_next_func(
-                    next_backboard, next_piece_id, next_shape_class)
+                next2_steps = self.get_next_func(next_backboard, next_piece_id, next_shape_class)
                 # 次がホールドの場合は今は考えないこととする
                 # if nextMove["strategy"]["use_hold_function"] == "y" and hold_piece_id == None:
                 #     next2_steps = self.get_next_func(
@@ -1745,11 +1736,9 @@ class Block_Controller(object):
             # if use target net, predicted by target model
 #             elif self.target_net:
 #                 # 画面ボードデータをコピーして 指定座標にテトリミノを配置し落下させた画面ボードとy座標を返す
-#                 next_backboard, drop_y = self.getBoard(
-#                     curr_backboard, curr_shape_class, action[1], action[0], action[2])
+#                 next_backboard, drop_y = self.getBoard(curr_backboard, curr_shape_class, action[1], action[0], action[2])
 #                 # 画面ボードで テトリミノ回転状態 に落下させたときの次の状態一覧を作成
-#                 next2_steps = self.get_next_func(
-#                     next_backboard, next_piece_id, next_shape_class)
+#                 next2_steps = self.get_next_func(next_backboard, next_piece_id, next_shape_class)
 #                 # 次の状態一覧の action と states で配列化
 #                 next2_actions, next2_states = zip(*next2_steps.items())
 #                 # next_states のテンソルを連結
@@ -1773,11 +1762,9 @@ class Block_Controller(object):
 #             # if not use target net,predicted by main model
 #             else:
 #                 # 画面ボードデータをコピーして 指定座標にテトリミノを配置し落下させた画面ボードとy座標を返す
-#                 next_backboard, drop_y = self.getBoard(
-#                     curr_backboard, curr_shape_class, action[1], action[0], action[2])
+#                 next_backboard, drop_y = self.getBoard(curr_backboard, curr_shape_class, action[1], action[0], action[2])
 #                 # 画面ボードで テトリミノ回転状態 に落下させたときの次の状態一覧を作成
-#                 next2_steps = self.get_next_func(
-#                     next_backboard, next_piece_id, next_shape_class)
+#                 next2_steps = self.get_next_func(next_backboard, next_piece_id, next_shape_class)
 #                 # 次の状態一覧の action と states で配列化
 #                 next2_actions, next2_states = zip(*next2_steps.items())
 #                 # 次の状態を index で指定し取得
@@ -1893,8 +1880,7 @@ class Block_Controller(object):
                     self.weight2_enable = False
 
                 # debug
-                print(GameStatus["judge_info"]["block_index"],
-                      self.weight2_enable, max_highest_hole)
+                print(GameStatus["judge_info"]["block_index"], self.weight2_enable, max_highest_hole)
 
             ##############
             # model 指定
@@ -1916,17 +1902,19 @@ class Block_Controller(object):
                 hold_index_list_to_q = {}
                 ######################
                 # 次の予測を上位predict_next_steps_trainつ実施, 1番目からpredict_next_num_train番目まで予測
-                index_list, index_list_to_q, next_actions, next_states\
-                    = self.get_predictions(self.model, True, GameStatus, next_steps, self.predict_next_steps_train, 1, self.predict_next_num_train, index_list, index_list_to_q, -60000)
+#★　                                                   ↓これが、originalのfalseからtrueに変わっている
+                index_list, index_list_to_q, next_actions, next_states \
+                    = self.get_predictions(self.model, False, GameStatus, next_steps, self.predict_next_steps_train,
+                     1, self.predict_next_num_train, index_list, index_list_to_q, -60000)
                 # print(index_list_to_q)
                 # print("max")
                 hold_index_list, hold_index_list_to_q, hold_next_actions, hold_next_states\
-                    = self.get_predictions(self.model, True, GameStatus, hold_steps, self.predict_next_steps_train, 1, self.predict_next_num_train, hold_index_list, hold_index_list_to_q, -60000)
+                    = self.get_predictions(self.model, False, GameStatus, hold_steps, self.predict_next_steps_train,
+                     1, self.predict_next_num_train, hold_index_list, hold_index_list_to_q, -60000)
 
                 # 全予測の最大 q
                 max_index_list = max(index_list_to_q, key=index_list_to_q.get)
-                hold_max_index_list = max(
-                    hold_index_list_to_q, key=hold_index_list_to_q.get)
+                hold_max_index_list = max(hold_index_list_to_q, key=hold_index_list_to_q.get)
 
                 # ホールドしたほうがQ値が良かったときは変数をホールドの場合に総入れ替えする
                 # 一度目のホールドの場合はactionは無視され次のターンとなり、二度目以降のホールドの場合はホールドされていたミノの動作をactionに格納する
@@ -1955,6 +1943,9 @@ class Block_Controller(object):
                 # 順伝搬し Q 値を取得 (model の __call__ ≒ forward)
                 predictions = predict_model(next_states)[:, 0]
                 hold_predictions = predict_model(hold_next_states)[:, 0]
+                ## 最大値の index 取得
+                index = torch.argmax(predictions).item()
+                hold_index = torch.argmax(hold_predictions).item()
 
                 if max(predictions) < max(hold_predictions):
                     nextMove["strategy"]["use_hold_function"] = "y"
@@ -1962,6 +1953,7 @@ class Block_Controller(object):
                     next_actions = hold_next_actions
                     next_states = hold_next_states
                     predictions = hold_predictions
+                    index = hold_index
 
             # 次の action を index を元に決定
             # 0: 2番目 X軸移動
@@ -2075,8 +2067,7 @@ class Block_Controller(object):
                 # 次の予想手リスト
                 # next_state Numpy に変換し int にして、1次元化
                 next_steps = self.get_next_func(np.ravel(next_state.numpy().astype(int)),
-                                                GameStatus["block_info"]["nextShapeList"]["element"+str(
-                                                    next_order)]["index"],
+                                                GameStatus["block_info"]["nextShapeList"]["element"+str(next_order)]["index"],
                                                 GameStatus["block_info"]["nextShapeList"]["element"+str(next_order)]["class"])
                 # GameStatus["block_info"]["nextShapeList"]["element"+str(1)]["direction_range"]
 
@@ -2149,8 +2140,7 @@ class Block_Controller(object):
         # if not, original backboard data will be updated later.
         board = copy.deepcopy(board_backboard)
         # 指定座標から落下させたところにテトリミノを固定しその画面ボードを返す
-        _board, drop_y = self.dropDown(
-            board, Shape_class, direction, center_x, center_y)
+        _board, drop_y = self.dropDown(board, Shape_class, direction, center_x, center_y)
         return _board, drop_y
 
     ####################################
@@ -2174,8 +2164,7 @@ class Block_Controller(object):
         # 画面ボード下限座標として dy 設定
         dy = self.board_data_height - 1
         # direction (回転状態)のテトリミノ2次元座標配列を取得し、それをx,yに配置した場合の座標配列を返す
-        coordArray = self.getShapeCoordArray(
-            Shape_class, direction, center_x, center_y)
+        coordArray = self.getShapeCoordArray(Shape_class, direction, center_x, center_y)
 
         # update dy
         # テトリミノ座標配列ごとに...
@@ -2191,8 +2180,7 @@ class Block_Controller(object):
             if _yy < dy:
                 dy = _yy
         # dy: テトリミノ落下下限座標を指定
-        _board = self.dropDownWithDy(
-            board, Shape_class, direction, center_x, dy)
+        _board = self.dropDownWithDy(board, Shape_class, direction, center_x, dy)
 
         # debug
         if self.debug_flag_drop_down == 1:
@@ -2215,13 +2203,11 @@ class Block_Controller(object):
         # board コピー
         _board = board
         # direction (回転状態)のテトリミノ2次元座標配列を取得し、それをx,yに配置した場合の座標配列を返す
-        coordArray = self.getShapeCoordArray(
-            Shape_class, direction, center_x, 0)
+        coordArray = self.getShapeCoordArray(Shape_class, direction, center_x, 0)
         # テトリミノ座標配列を順に進める
         for _x, _y in coordArray:
             # center_x, center_y の 画面ボードにブロックを配置して、その画面ボードデータを返す
-            _board[(_y + center_y) * self.board_data_width +
-                   _x] = Shape_class.shape
+            _board[(_y + center_y) * self.board_data_width + _x] = Shape_class.shape
         return _board
 
 

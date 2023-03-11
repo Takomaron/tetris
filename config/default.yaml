@@ -48,30 +48,30 @@ train:
   reward_list: #These parameter are not normalized. 消去報酬の配分  ■ここでは正規化されてないが、後で正規化される。
     - 0  #survival
     - 500 #0 #1block
-    - 1500 #2block
-    - 5000 #3block
-    - 10000 #4block ■ブロックと書かれているが、消せる行数に相当する報酬として使われている。
-    - -10000 #game over
+    - 2000 #2block
+    - 8000 #3block
+    - 32000 #4block ■ブロックと書かれているが、消せる行数に相当する報酬として使われている。:★10000
+    - -32000 #game over　★10000
   height_line_reward: 3 #低いところの消去ほど有効とする設定(10000 くらいでほぼ無効 大きい値ほど報酬小さい)
   reward_weight: # 形状報酬の配分
     - 0.0005 #1 #bampiness 
     - 0.01 #1 #max height
-    - 0.001 #1 #hole_num
+    - 0.005 #1 #hole_num
   bumpiness_left_side_relax: 1 # 左端のでこぼこだけどこまで許容するか
-  max_height_relax: 14 # 高さをどこまで許容するか(左記より大きい)
+  max_height_relax: 11 # 高さをどこまで許容するか(左記より大きい):★14
 
-  tetris_fill_reward: 0.0001 # 左端以外を埋める報酬率 #DQN限定 #DQN限定
+  tetris_fill_reward: 0.1 # 左端以外を埋める報酬率 #DQN限定 #DQN限定
   tetris_fill_height: 11 # 左端以外を埋める報酬有効化上限高さ #DQN限定
-  left_side_height_penalty: 0.00001 # 左端を tetris_fill_height 以上積んだ時の penalty #DQN限定
+  left_side_height_penalty: 0.1 # 左端を tetris_fill_height 以上積んだ時の penalty #DQN限定
 
   hole_top_limit_reward: 0.00001  # 穴の上の積み上げペナルティ #DQN限定
-  hole_top_limit_height: 5 # 穴の上の積み上げペナルティ下限絶対高さ、この高さより上のときのみペナルティ有効 (22: 無効, -1:制限なし)
+  hole_top_limit_height: 0 # 穴の上の積み上げペナルティ下限絶対高さ、この高さより上のときのみペナルティ有効 (22: 無効, -1:制限なし)
   hole_top_limit: 1 # 穴の上の積み上げペナルティ 穴の位置が左記の相対高さより高いときのみ
 
-  move_down_flag: 0 # Move Down 有効化 #DQN限定
+  move_down_flag: 1 # Move Down 有効化 #DQN限定
 
   #predict_next_flag: 1 # 次のテトリミノ予測有効化 # 20220831 無効
-  predict_next_num: 0 # 次のテトリミノ予測数 (0: 無効) #DQN限定
+  predict_next_num: 4 # 次のテトリミノ予測数 (0: 無効) #DQN限定
   predict_next_steps: 5 #  1つの手番で候補手をいくつ探すか #DQN限定
   predict_next_num_train: 1 # 次のテトリミノ予測有効化 (学習時) (0: 無効) #DQN限定
   predict_next_steps_train: 3 #  1つの手番で候補手をいくつ探すか (学習時) #DQN限定
