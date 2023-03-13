@@ -1402,6 +1402,11 @@ class Block_Controller(object):
         
         # 報酬の計算
         reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height))/self.height_line_reward)
+
+        # I型テトリミノをクリア行数3未満の場合にホールドしていれば、報酬＋
+        if hold_shape_id == 1 & lines_cleared < 3:
+            reward += 0.001
+
 #       左端を除いた最低高さが4以下の場合は低い分だけペナルティ
 #        reward += min(0, (min_height_l - 4))/self.height_line_reward
 #       左端を除いた最低高さが4以下の場合は報酬を半分にする
@@ -1412,9 +1417,9 @@ class Block_Controller(object):
         # 形状の罰報酬
         # でこぼこ度罰
         reward -= self.reward_weight[0] * bampiness
-        # 最大高さ罰
+        # 最大高さ罰　->　最大高さを超えた差分に比例するように変更
         if max_height > self.max_height_relax:
-            reward -= self.reward_weight[1] * max(0, max_height)
+            reward -= self.reward_weight[1] * max(0, max_height-self.max_height_relax)
         # 穴の数罰
         reward -= self.reward_weight[2] * hole_num
         # 穴の上のブロック数罰
