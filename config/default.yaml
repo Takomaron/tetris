@@ -52,17 +52,17 @@ train:
     - 100 #3block
     - 1000 #4block ■ブロックと書かれているが、消せる行数に相当する報酬として使われている。:★10000
     - -1000 #game over　★10000
-  height_line_reward: 2200 #低いところの消去ほど有効とする設定(10000 くらいでほぼ無効 大きい値ほど報酬小さい)
+  height_line_reward: 8800 #低いところの消去ほど有効とする設定(10000 くらいでほぼ無効 大きい値ほど報酬小さい)
   reward_weight: # 形状報酬の配分
     - 0.0001 #1 #bampiness 
     - 0.005 #1 #max height
     - 0.005 #1 #hole_num
   bumpiness_left_side_relax: 1 # 左端のでこぼこだけどこまで許容するか
-  max_height_relax: 11 # 高さをどこまで許容するか(左記より大きい):★14
+  max_height_relax: 14 # 高さをどこまで許容するか(左記より大きい):★14
 
-  tetris_fill_reward: 0.001 # 左端以外を埋める報酬率 #DQN限定 #DQN限定
-  tetris_fill_height: 11 # 左端以外を埋める報酬有効化上限高さ #DQN限定
-  left_side_height_penalty: 0.00001 # 左端を tetris_fill_height 以上積んだ時の penalty #DQN限定
+  tetris_fill_reward: 0.01 # 左端以外を埋める報酬率 #DQN限定 #DQN限定
+  tetris_fill_height: 1 # 左端以外を埋める報酬有効化上限高さ #DQN限定
+  left_side_height_penalty: 0.001 # 左端を tetris_fill_height 以上積んだ時の penalty #DQN限定
 
   hole_top_limit_reward: 0.0005  # 穴の上の積み上げペナルティ #DQN限定
   hole_top_limit_height: 0 # 穴の上の積み上げペナルティ下限絶対高さ、この高さより上のときのみペナルティ有効 (22: 無効, -1:制限なし)

@@ -954,9 +954,9 @@ class Block_Controller(object):
             # そろっている段ごとに報酬。掛け算で低い行でたくさんそろっているのを報酬高く。
             if self.get_line_right_fill(reshape_board, sum_, i):
                 reward += 1
-                # 1段目は2倍    バグってた。そろってなくてもreward +5になってた。
-                if i == 1:
-                    reward += 5
+#                # 1段目は2倍    バグってた。そろってなくてもreward +5になってた。
+#                if i == 1:
+#                    reward += 5
 
 #        # ホールドしているテトリミノがIであれば、報酬を1行目と同じだけ足しこむ
 #        if piece_id == 1:  # I
