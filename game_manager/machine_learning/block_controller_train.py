@@ -954,9 +954,20 @@ class Block_Controller(object):
             # そろっている段ごとに報酬。掛け算で低い行でたくさんそろっているのを報酬高く。
             if self.get_line_right_fill(reshape_board, sum_, i):
                 reward += 1
-#                # 1段目は2倍    バグってた。そろってなくてもreward +5になってた。
-#                if i == 1:
-#                    reward += 5
+                # 1段目は2倍    バグってた。そろってなくてもreward +5になってた。
+                if i == 1:
+                    reward += 5
+        """
+        for i in range(1, self.height):
+            # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
+            if reshape_board[self.height - i][0] == 0:
+                # 高さがtetris fill height未満の間だけ報酬を加算する。
+                if self.get_line_right_fill(reshape_board, sum_, i) & i < self.tetris_fill_height:
+                    reward += 1
+            else:   # 左端が埋まってたら報酬０
+                reward = 0
+                break   # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
+        """
 
 #        # ホールドしているテトリミノがIであれば、報酬を1行目と同じだけ足しこむ
 #        if piece_id == 1:  # I
@@ -1401,34 +1412,79 @@ class Block_Controller(object):
         ## ホールドしているテトリミノ計上の報酬計算　と思ったが、保持しているものがI型の時の左端開けた場合の報酬を上げるようにする。
         
         # 報酬の計算
-        reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height))/self.height_line_reward)
+##        reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height))/self.height_line_reward)
+## 1をMax rewardにするため、4より低くないところで削除したら、Penaltyとする。
+        reward = self.reward_list[lines_cleared] * (1 - (max(0, max_height - 4))/self.height_line_reward)
+        """
+        reward = self.reward_list[lines_cleared]    # 0-1に正規化されている。
+        reward += (self.height - max(0, max_height))/self.height_line_reward
+        """
 
+        """
         # I型テトリミノをクリア行数3未満の場合にホールドしていれば、報酬＋
-        if hold_shape_id == 1 & lines_cleared < 3:
-            reward += 0.001
+#        if hold_shape_id == 1 & lines_cleared < 3:
+        # I型テトリミノをテトリス後にホールドしていなければ、報酬＋
+        if hold_shape_id != 1 & lines_cleared == 4:
+            reward += 0.1
+        """
 
+        """
 #       左端を除いた最低高さが4以下の場合は低い分だけペナルティ
 #        reward += min(0, (min_height_l - 4))/self.height_line_reward
 #       左端を除いた最低高さが4以下の場合は報酬を半分にする
 #        if min_height_l < 4:
 #            reward /= 2
+        """
         # 継続報酬
         # reward += 0.01
         # 形状の罰報酬
         # でこぼこ度罰
         reward -= self.reward_weight[0] * bampiness
-        # 最大高さ罰　->　最大高さを超えた差分に比例するように変更
+        """
+        # 凸凹度が低ければ報酬＋
+        if bampiness:
+            reward += self.reward_weight[0] / bampiness
+        """
+
+        # 最大高さ罰　->　最大高さを超えた差分に比例するように変更。ここだけ罰
         if max_height > self.max_height_relax:
-            reward -= self.reward_weight[1] * max(0, max_height-self.max_height_relax)
+          reward -= self.reward_weight[1] * max(0, max_height-self.max_height_relax)
+        """
+        # 最大高さ　->　最大高さを超えていなければ、報酬。比例させると低いほど報酬が高くなるので固定値
+        if max_height < self.max_height_relax:
+            reward += self.reward_weight[1]
+        """
         # 穴の数罰
         reward -= self.reward_weight[2] * hole_num
+        """
+        # 穴の数が少なければ、少ないだけ報酬
+        if hole_num:
+            reward += self.reward_weight[2] / hole_num
+        """
         # 穴の上のブロック数罰
         reward -= self.hole_top_limit_reward * hole_top_penalty * max_highest_hole
-        # 左端以外埋めている状態報酬
-        reward += tetris_reward * self.tetris_fill_reward
+        """
+        # 穴の上のブロック数が少なければ少ないだけ報酬
+        if max_highest_hole:
+            reward += self.hole_top_limit_reward * hole_top_penalty / max_highest_hole
+        """
+
+##        # 左端以外埋めている状態報酬
+##        reward += tetris_reward * self.tetris_fill_reward
+        if left_side_height == 0:   # 左端が埋まっていない時だけ報酬を与える。
+            reward += tetris_reward * self.tetris_fill_reward
+
         # 左端が高すぎる場合の罰
-        if left_side_height > self.bumpiness_left_side_relax:
+##        if left_side_height > self.bumpiness_left_side_relax:
+        ## 高さ制限を超えない限りペナルティを与える。
+        if left_side_height > self.bumpiness_left_side_relax & max_height < self.max_height_relax:
             reward -= (left_side_height - self.bumpiness_left_side_relax) * self.left_side_height_penalty
+        """
+       上記の報酬は改造後のtetris_reward内でまかなわれる。しかし、もとのtetris_rewardそのままで、左端高さが0以外なら報酬出さないようにしてもよかった。
+        """
+        #★ ペナルティは普通に計算させる。4列消したらreward 1固定。ペナルティ無し。
+        if lines_cleared == 4:
+            reward = 1
 
         self.epoch_reward += reward
 
