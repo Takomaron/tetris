@@ -534,7 +534,8 @@ class Block_Controller(object):
             if len(self.replay_memory) < self.replay_memory_size / 10:
                 print("================pass================")
                 print("iter: {} ,meory: {}/{} , score: {}, clear line: {}, block: {}, col1-4: {}/{}/{}/{} ".format(self.iter,
-                                                                                                                   len(self.replay_memory), self.replay_memory_size / 10, self.score, self.cleared_lines, self.tetrominoes, self.cleared_col[1], self.cleared_col[2], self.cleared_col[3], self.cleared_col[4]))
+                len(self.replay_memory), self.replay_memory_size / 10, self.score, self.cleared_lines
+                , self.tetrominoes, self.cleared_col[1], self.cleared_col[2], self.cleared_col[3], self.cleared_col[4]))
             # リプレイメモリがいっぱいなら
             else:
                 print("================update================")
@@ -875,8 +876,7 @@ class Block_Controller(object):
                     # 穴の上の地面が高いなら Penalty
                     if highest_holes[i] > self.hole_top_limit_height and \
                             highest_grounds[i] >= highest_holes[i] + self.hole_top_limit:
-                        hole_top_penalty += highest_grounds[i] - \
-                            (highest_holes[i])
+                        hole_top_penalty += highest_grounds[i] - (highest_holes[i])
             # 最も高い位置にある穴の数で割る・・・■穴の数じゃなくて高いところが開いている列の数だ。
             hole_top_penalty /= highest_hole_num
             # debug
@@ -956,7 +956,7 @@ class Block_Controller(object):
                 reward += 1
                 # 1段目は2倍    バグってた。そろってなくてもreward +5になってた。
                 if i == 1:
-                    reward += 5
+                    reward += 2
         """
         for i in range(1, self.height):
             # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
@@ -1475,10 +1475,13 @@ class Block_Controller(object):
             reward += tetris_reward * self.tetris_fill_reward
 
         # 左端が高すぎる場合の罰
-##        if left_side_height > self.bumpiness_left_side_relax:
-        ## 高さ制限を超えない限りペナルティを与える。
+        if left_side_height > self.bumpiness_left_side_relax:
+            reward -= (left_side_height - self.bumpiness_left_side_relax) * self.left_side_height_penalty
+        """
+        ## 左端が高すぎる場合の罰。ただし、max高さが高さ制限を超えたらペナルティなしにする。
         if left_side_height > self.bumpiness_left_side_relax & max_height < self.max_height_relax:
             reward -= (left_side_height - self.bumpiness_left_side_relax) * self.left_side_height_penalty
+        """
         """
        上記の報酬は改造後のtetris_reward内でまかなわれる。しかし、もとのtetris_rewardそのままで、左端高さが0以外なら報酬出さないようにしてもよかった。
         """
