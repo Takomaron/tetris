@@ -33,12 +33,12 @@ train:
   num_decay_epochs: 3500 # ε収束させる試行回数
   initial_epsilon: 1.0 # ε... 学習が局所解にならないように乱数で動かして最適値する。学習初期は 1, 初期値 Fine Tune の場合は小さめに  (0 to 1.0)
   final_epsilon: 1.0e-3 # 上記εを漸減させたときの最終値 num_decay_epochs 試行後  (0 to final_epsilon)
-  batch_size: 512 # バッチサイズ　確率的勾配降下法における、全パラメータのうちランダム抽出して勾配を求めるパラメータの数 (2^n)
+  batch_size: 1024 # バッチサイズ　確率的勾配降下法における、全パラメータのうちランダム抽出して勾配を求めるパラメータの数 (2^n)
   gamma: 0.8 # 割引率 ... t+1 の報酬をどの程度割り引いて考えるか (0 to 1.0)
   max_penalty: -1 # 正規化する場合の最小報酬 ( to 0)
   target_net: True #Target net, double_dqn 有効の場合は無条件で有効  (True False) 
   target_copy_intarval: 500 # Target Net をロードする EPOCH 数間隔  (1 to num_epoch)
-  replay_memory_size: 30000  # (1 to num_epoch*10)
+  replay_memory_size: 100000  # (1 to num_epoch*10)
   double_dqn: True # Dobule DQN 有効化 #DQN限定 (True False)
   reward_clipping: True # 報酬を 1 で正規化、ただし消去報酬のみ
   prioritized_replay: True # 優先順位つき再生学習 有効化 (True False)
@@ -47,16 +47,16 @@ train:
 
   reward_list: #These parameter are not normalized. 消去報酬の配分  ■ここでは正規化されてないが、後で正規化される。
     - 0     #0      0survival
-    - 500   #500    1block
-    - 1500  #1500   2block
-    - 5000  #5000   3block
+    - 10   #500    1block
+    - 100  #1500   2block
+    - 1000  #5000   3block
     - 10000 #10000  4block ■ブロックと書かれているが、消せる行数に相当する報酬として使われている。:★10000
-    - -10000 #-10000 game over
+    - -100000 #-10000 game over
   height_line_reward: 2200 # 3	低いところの消去ほど有効とする設定(10000 くらいでほぼ無効 大きい値ほど報酬小さい)
   reward_weight: # 形状報酬の配分
-    - 0.0005 #1 #bampiness 
-    - 0.01 #1 #max height
-    - 0.001 #1 #hole_num
+    - 0.001 #0.0005 1 #bampiness 
+    - 0.005 #0.01 1 #max height
+    - 0.01 #0.001 1 #hole_num
   bumpiness_left_side_relax: 10 # 1 左端のでこぼこだけどこまで許容するか
   max_height_relax: 14 # 14  高さをどこまで許容するか(左記より大きい):★14
 
@@ -65,7 +65,7 @@ train:
   left_side_height_penalty: 0.001 #0.00001 左端を tetris_fill_height 以上積んだ時の penalty #DQN限定
 
   hole_top_limit_reward: 0.00001  # 0.00001 穴の上の積み上げペナルティ #DQN限定
-  hole_top_limit_height: 5 # 5 穴の上の積み上げペナルティ下限絶対高さ、この高さより上のときのみペナルティ有効 (22: 無効, -1:制限なし)
+  hole_top_limit_height: -1 # 5 穴の上の積み上げペナルティ下限絶対高さ、この高さより上のときのみペナルティ有効 (22: 無効, -1:制限なし)
   hole_top_limit: 1 # 1 穴の上の積み上げペナルティ 穴の位置が左記の相対高さより高いときのみ
 
   move_down_flag: 0 # 0 Move Down 有効化 #DQN限定
@@ -85,4 +85,4 @@ tetris:
     - 700
     - 1300
     - -500
-  max_tetrominoes: 300 # 1 EPOCH のテトリミノ学習数
+  max_tetrominoes: 200 # 300 1 EPOCH のテトリミノ学習数
