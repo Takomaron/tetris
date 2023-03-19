@@ -1386,7 +1386,7 @@ class Block_Controller(object):
     # reward_func から呼び出される
     # ホールド中のテトリミノ形状も報酬計算に使用する。
     ####################################
-    def step_v2(self, curr_backboard, action, curr_shape_class, hold_shape_id):
+    def step_v2(self, curr_backboard, action, curr_shape_class, curr_piece_id, hold_piece_id):
         # 次の action を index を元に決定
         # 0: 2番目 X軸移動
         # 1: 1番目 テトリミノ回転
@@ -1405,15 +1405,15 @@ class Block_Controller(object):
         # 穴の数, 穴の上積み上げ Penalty, 最も高い穴の位置を求める
         hole_num, hole_top_penalty, max_highest_hole = self.get_holes(reshape_board, min_height)
         # 左端あけた形状の報酬計算
-        tetris_reward = self.get_tetris_fill_reward(reshape_board, hold_shape_id)
+        tetris_reward = self.get_tetris_fill_reward(reshape_board, hold_piece_id)
         # 消せるセルの確認
         lines_cleared, reshape_board = self.check_cleared_rows(reshape_board)
         
         ## ホールドしているテトリミノ計上の報酬計算　と思ったが、保持しているものがI型の時の左端開けた場合の報酬を上げるようにする。
-        
+
         # 報酬の計算
 ##        reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height))/self.height_line_reward)
-## 1をMax rewardにするため、4より低くないところで削除したら、Penaltyとする。
+## 1をMax rewardにするため、5行目以上で削除したら、Penaltyとする。
         reward = self.reward_list[lines_cleared] * (1 - (max(0, max_height - 4))/self.height_line_reward)
         """
         reward = self.reward_list[lines_cleared]    # 0-1に正規化されている。
@@ -1422,11 +1422,23 @@ class Block_Controller(object):
 
         """
         # I型テトリミノをクリア行数3未満の場合にホールドしていれば、報酬＋
-#        if hold_shape_id == 1 & lines_cleared < 3:
+        if hold_shape_id == 1 & lines_cleared < 3:
         # I型テトリミノをテトリス後にホールドしていなければ、報酬＋
         if hold_shape_id != 1 & lines_cleared == 4:
             reward += 0.1
         """
+
+        # 以下は、左空けしてよい高さ以下の場合に計算 Retry07
+        if max_height < self.tetris_fill_height:
+
+            #   左側に置く高さ以下の時に、Iミノの水平置きは禁止。
+            # curr_shapeがIで、direction0が水平で、かつ、holdしているものがIでなければ、ペナルティにする。
+            if hold_piece_id != 1 & curr_piece_id == 1 & direction0 == 0:
+                reward -= 0.1
+
+            # 落としたのがI型で、クリア行数が3未満の場合に、I型をホールドしていなければ、ペナルティ
+            if hold_piece_id != 1 & curr_piece_id == 1 & lines_cleared < 3:
+                reward -= 0.1
 
         """
 #       左端を除いた最低高さが4以下の場合は低い分だけペナルティ
@@ -1743,9 +1755,9 @@ class Block_Controller(object):
               if hold_piece_id == None: # 初回hold
                 reward = 0  # holdは早めに実施されるようmax値を設定
               else:
-                reward = self.step_v2(curr_backboard, action, hold_shape_class, curr_piece_id)
+                reward = self.step_v2(curr_backboard, action, hold_shape_class, hold_piece_id, curr_piece_id)
             else:
-              reward = self.step_v2(curr_backboard, action, curr_shape_class, hold_piece_id)
+              reward = self.step_v2(curr_backboard, action, curr_shape_class, curr_piece_id, hold_piece_id)
 
             done = False  # game over flag
 

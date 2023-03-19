@@ -10,14 +10,14 @@ common:
   predict_weight: weight/DQN/best_weight.pt
 
   #### 第2model 有効
-  weight2_available: False
+  weight2_available: True #False
   #### 第2model
-  predict_weight2: outputs/YYYY-MM-DD-hh-mm-ss/trained_model/best_weight.pt
+  predict_weight2: weight/DQN/best_weight_Retry01.pt
 
   #### model 切り替えポイント (最も高い穴の位置が下記より低いとき)
-  predict_weight2_enable_index: 5
+  predict_weight2_enable_index: 5 # 5
   #### model 戻しポイント (最も高い穴の位置下記より高いとき)
-  predict_weight2_disable_index: 10
+  predict_weight2_disable_index: 10 # 10
 model:
   name: DQN # 学習方式 (MLP DQN)
   finetune: False # 以前の学習結果を利用する (True False)
@@ -56,11 +56,11 @@ train:
   reward_weight: # 形状報酬の配分
     - 0.005 #0.0005 1 #bampiness 
     - 0.005 #0.01 1 #max height
-    - 0.005 #0.001 1 #hole_num
+    - 0.05 #0.001 1 #hole_num
   bumpiness_left_side_relax: 8 # 1 左端のでこぼこだけどこまで許容するか
   max_height_relax: 14 # 14  高さをどこまで許容するか(左記より大きい):★14
 
-  tetris_fill_reward: 0.03 # 0.0001 左端以外を埋める報酬率 #DQN限定 #DQN限定
+  tetris_fill_reward: 0.05 # 0.0001 左端以外を埋める報酬率 #DQN限定 #DQN限定
   tetris_fill_height: 11 # 11 左端以外を埋める報酬有効化上限高さ #DQN限定
   left_side_height_penalty: 0.001 #0.00001 左端を tetris_fill_height 以上積んだ時の penalty #DQN限定
 
