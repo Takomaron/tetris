@@ -1413,8 +1413,14 @@ class Block_Controller(object):
 
         # 報酬の計算
 ##        reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height))/self.height_line_reward)
-## 1をMax rewardにするため、5行目以上で削除したら、Penaltyとする。
-        reward = self.reward_list[lines_cleared] * (1 - (max(0, max_height - 4))/self.height_line_reward)
+## 1をMax rewardにするため、クリア報酬に4行目より高くなる分だけ、Penaltyとする。
+#        reward = self.reward_list[lines_cleared] * (1 - (max(0, max_height - 4))/self.height_line_reward)
+        # クリア報酬について4段クリアはできるだけ低いところ、4段クリア以外は4段以上でできるだけ低いところの報酬にする
+        # ■これをすればいいかも、穴数とか、減っている場合は報酬＋
+        if lines_cleared == 4:
+            reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height))/self.height_line_reward)
+        else:
+            reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height - 4))/self.height_line_reward)
         """
         reward = self.reward_list[lines_cleared]    # 0-1に正規化されている。
         reward += (self.height - max(0, max_height))/self.height_line_reward
@@ -1434,11 +1440,11 @@ class Block_Controller(object):
             #   左側に置く高さ以下の時に、Iミノの水平置きは禁止。
             # curr_shapeがIで、direction0が水平で、かつ、holdしているものがIでなければ、ペナルティにする。
             if hold_piece_id != 1 & curr_piece_id == 1 & direction0 == 0:
-                reward -= 0.1
+                reward -= 0.01
 
             # 落としたのがI型で、クリア行数が3未満の場合に、I型をホールドしていなければ、ペナルティ
             if hold_piece_id != 1 & curr_piece_id == 1 & lines_cleared < 3:
-                reward -= 0.1
+                reward -= 0.01
 
         """
 #       左端を除いた最低高さが4以下の場合は低い分だけペナルティ
