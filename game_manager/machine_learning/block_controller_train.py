@@ -1466,7 +1466,7 @@ class Block_Controller(object):
 
         # 最大高さ罰　->　最大高さを超えた差分に比例するように変更。ここだけ罰
         if max_height > self.max_height_relax:
-          reward -= self.reward_weight[1] * max(0, max_height-self.max_height_relax)
+            reward -= self.reward_weight[1] * max(0, max_height-self.max_height_relax)
         """
         # 最大高さ　->　最大高さを超えていなければ、報酬。比例させると低いほど報酬が高くなるので固定値
         if max_height < self.max_height_relax:
