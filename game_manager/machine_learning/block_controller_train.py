@@ -1417,6 +1417,8 @@ class Block_Controller(object):
 #        reward = self.reward_list[lines_cleared] * (1 - (max(0, max_height - 4))/self.height_line_reward)
         # クリア報酬について4段クリアはできるだけ低いところ、4段クリア以外は4段以上でできるだけ低いところの報酬にする
         # ■これをすればいいかも、穴数とか、減っている場合は報酬＋
+        # ■■この式は、行削除に伴う報酬減を相殺するためのものだ。たとえば、左端空け行数によるtetris_rewardを補充するもの
+        #　Retry09なら、tetris_rewardは0.006になるので、それ以上加算できないと、報酬増にならない。
         if lines_cleared == 4:
             reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height))/self.height_line_reward)
         else:
@@ -1487,10 +1489,10 @@ class Block_Controller(object):
             reward += self.hole_top_limit_reward * hole_top_penalty / max_highest_hole
         """
 
-##        # 左端以外埋めている状態報酬
-##        reward += tetris_reward * self.tetris_fill_reward
-        if left_side_height == 0:   # 左端が埋まっていない時だけ報酬を与える。
-            reward += tetris_reward * self.tetris_fill_reward
+        # 左端以外埋めている状態報酬
+        reward += tetris_reward * self.tetris_fill_reward
+##        if left_side_height == 0:   # 左端が埋まっていない時だけ報酬を与える。・・・これをすると、穴埋めするとき報酬が下がることになるのでよくない。
+##            reward += tetris_reward * self.tetris_fill_reward
 
         # 左端が高すぎる場合の罰
         if left_side_height > self.bumpiness_left_side_relax:
