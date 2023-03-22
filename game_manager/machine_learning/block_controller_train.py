@@ -830,6 +830,8 @@ class Block_Controller(object):
         highest_grounds = [-1] * self.width
         # 最も高い穴の list
         highest_holes = [-1] * self.width
+        lowest_holes = [-1] * self.width
+
         # 列ごとに切り出し
         for i in range(self.width):
             # 列取得
@@ -857,8 +859,10 @@ class Block_Controller(object):
             # 最も高い穴の位置配列
             if len(cols_holes) > 0:
                 highest_holes[i] = cols_holes[0]
+                lowest_holes[i] = cols_holes[-1]    # 最も低い穴の位置配列
             else:
                 highest_holes[i] = -1
+                lowest_holes[i] = -1
 
         # 最も高い穴を求める
         max_highest_hole = max(highest_holes)
@@ -866,11 +870,19 @@ class Block_Controller(object):
         ## hole_top_penaltyを穴の上のブロック数の総和に変更
         # 列ごとに切り出し
         for i in range(self.width):
+            # 穴の底位置がhole_top_limit_heightより高く
+            # 穴の上の地面がhole_top_limitより高いなら Penalty
+            if lowest_holes[i] > self.hole_top_limit_height and \
+                    highest_grounds[i] >= lowest_holes[i] + self.hole_top_limit:
+                hole_top_penalty += highest_grounds[i] - (lowest_holes[i])
+            # これは、穴の上の積み上げ数ではなく、穴の上の積み上げ高さになる。穴が多くても、ペナルティは一緒。天井が消されれば、ペナルティが一気に減るからいい方向
+            """
             # 穴の絶対位置がhole_top_limit_heightより高く
             # 穴の上の地面が高いなら Penalty
             if highest_holes[i] > self.hole_top_limit_height and \
                     highest_grounds[i] >= highest_holes[i] + self.hole_top_limit:
                 hole_top_penalty += highest_grounds[i] - (highest_holes[i])
+            """
         """
         # 到達可能の最下層より1行下の穴の位置をチェック
 #        if min_height > 0: #　これもバグみたいだ。
