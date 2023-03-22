@@ -1401,10 +1401,13 @@ class Block_Controller(object):
         ## ホールドしているテトリミノ計上の報酬計算　と思ったが、保持しているものがI型の時の左端開けた場合の報酬を上げるようにする。
         
         # 報酬の計算
+        reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height))/self.height_line_reward)
+        """
         if lines_cleared == 4:
             reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height))/self.height_line_reward)
         else:
             reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height))/self.height_line_reward/2)
+        """
 
         # I型テトリミノをクリア行数3未満の場合にホールドしていれば、報酬＋
 #        if hold_shape_id == 1 & lines_cleared < 3:
@@ -1422,7 +1425,8 @@ class Block_Controller(object):
         reward -= self.reward_weight[0] * bampiness
         # 最大高さ罰　->　最大高さを超えた差分に比例するように変更
         if max_height > self.max_height_relax:
-            reward -= self.reward_weight[1] * max(0, max_height-self.max_height_relax)
+            reward -= self.reward_weight[1] * max(0, max_height)
+##            reward -= self.reward_weight[1] * max(0, max_height-self.max_height_relax)
         # 穴の数罰
         reward -= self.reward_weight[2] * hole_num
         # 穴の上のブロック数罰
