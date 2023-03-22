@@ -863,8 +863,18 @@ class Block_Controller(object):
         # 最も高い穴を求める
         max_highest_hole = max(highest_holes)
 
+        ## hole_top_penaltyを穴の上のブロック数の総和に変更
+        # 列ごとに切り出し
+        for i in range(self.width):
+            # 穴の絶対位置がhole_top_limit_heightより高く
+            # 穴の上の地面が高いなら Penalty
+            if highest_holes[i] > self.hole_top_limit_height and \
+                    highest_grounds[i] >= highest_holes[i] + self.hole_top_limit:
+                hole_top_penalty += highest_grounds[i] - (highest_holes[i])
+        """
         # 到達可能の最下層より1行下の穴の位置をチェック
-        if min_height > 0:
+#        if min_height > 0: #　これもバグみたいだ。
+        if min_height >= 0:
             # 最も高いところにある穴の数
             highest_hole_num = 0
             # 列ごとに切り出し
@@ -884,6 +894,7 @@ class Block_Controller(object):
             # print(['{:02}'.format(n) for n in highest_holes])
             # print(hole_top_penalty, hole_top_penalty*max_highest_hole)
             # print("==")
+        """
 
         return num_holes, hole_top_penalty, max_highest_hole
 
@@ -1505,9 +1516,11 @@ class Block_Controller(object):
         """
        上記の報酬は改造後のtetris_reward内でまかなわれる。しかし、もとのtetris_rewardそのままで、左端高さが0以外なら報酬出さないようにしてもよかった。
         """
+        """
         #★ ペナルティは普通に計算させる。4列消したらreward 1固定。ペナルティ無し。
         if lines_cleared == 4:
             reward = 1
+        """
 
         self.epoch_reward += reward
 
