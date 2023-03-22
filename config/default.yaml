@@ -47,9 +47,9 @@ train:
 
   reward_list: #These parameter are not normalized. 消去報酬の配分  ■ここでは正規化されてないが、後で正規化される。
     - 0  #survival
-    - 10 #0 #1block
-    - 100 #2block
-    - 1000 #3block
+    - 500 #0 #1block
+    - 1500 #2block
+    - 5000 #3block
     - 10000 #4block ■ブロックと書かれているが、消せる行数に相当する報酬として使われている。:★10000
     - -10000 #game over　★10000
   height_line_reward: 3 #低いところの消去ほど有効とする設定(10000 くらいでほぼ無効 大きい値ほど報酬小さい)
