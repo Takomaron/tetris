@@ -47,9 +47,9 @@ train:
 
   reward_list: #These parameter are not normalized. 消去報酬の配分  ■ここでは正規化されてないが、後で正規化される。
     - 0     #0      0survival
-    - 10   #500    1block★ここ以下触らない。触ると、tetris_fill_reward 、height_line_reward に影響
-    - 100  #1500   2block
-    - 1000  #5000   3block
+    - 500   #500    1block★ここ以下触らない。触ると、tetris_fill_reward 、height_line_reward に影響
+    - 1500  #1500   2block
+    - 5000  #5000   3block
     - 10000 #10000  4block ■ブロックと書かれているが、消せる行数に相当する報酬として使われている。:★10000
     - -10000 #-10000 game over
   height_line_reward: 833 #★触らない 3	低いところの消去ほど有効とする設定(10000 くらいでほぼ無効 大きい値ほど報酬小さい)
