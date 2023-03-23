@@ -863,7 +863,8 @@ class Block_Controller(object):
         max_highest_hole = max(highest_holes)
 
         # 到達可能の最下層より1行下の穴の位置をチェック
-        if min_height > 0:
+#        if min_height > 0:
+        if min_height >= 0:
             # 最も高いところにある穴の数
             highest_hole_num = 0
             # 列ごとに切り出し
