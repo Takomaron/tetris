@@ -1445,7 +1445,7 @@ class Block_Controller(object):
         if lines_cleared == 4:
             reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height))/self.height_line_reward)
         else:
-            reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height - 4))/self.height_line_reward)
+            reward = self.reward_list[lines_cleared] * (1 + max(0, self.height - 4 - max(0, max_height))/self.height_line_reward)
         """
         reward = self.reward_list[lines_cleared]    # 0-1に正規化されている。
         reward += (self.height - max(0, max_height))/self.height_line_reward
@@ -1505,7 +1505,9 @@ class Block_Controller(object):
             reward += self.reward_weight[2] / hole_num
         """
         # 穴の上のブロック数罰
-        reward -= self.hole_top_limit_reward * hole_top_penalty * max_highest_hole
+##        reward -= self.hole_top_limit_reward * hole_top_penalty * max_highest_hole
+        ## hole_top_penaltyの計算式を総数にしたので、こちらの式も変える
+        reward -= self.hole_top_limit_reward * hole_top_penalty
         """
         # 穴の上のブロック数が少なければ少ないだけ報酬
         if max_highest_hole:
@@ -1526,7 +1528,8 @@ class Block_Controller(object):
             reward -= (left_side_height - self.bumpiness_left_side_relax) * self.left_side_height_penalty
         """
         """
-       上記の報酬は改造後のtetris_reward内でまかなわれる。しかし、もとのtetris_rewardそのままで、左端高さが0以外なら報酬出さないようにしてもよかった。
+       上記の報酬は改造後のtetris_reward内でまかなわれる。しかし、もとのtetris_rewardそのままで、
+       左端高さが0以外なら報酬出さないようにしてもよかった。
         """
         """
         #★ ペナルティは普通に計算させる。4列消したらreward 1固定。ペナルティ無し。
