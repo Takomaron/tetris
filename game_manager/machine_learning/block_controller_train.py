@@ -816,7 +816,7 @@ class Block_Controller(object):
         total_bumpiness = np.sum(diffs)
 
         # Retry17 上記の計算だけだと階段状の場合に凸凹度が低くなるので、さらに高低差を加える。
-        total_bunpiness += (max_height - min_height_l)
+        total_bumpiness += (max_height - min_height_l)
 
         return total_bumpiness, total_height, max_height, min_height, heights[0], min_height_l
 
