@@ -862,18 +862,20 @@ class Block_Controller(object):
                 lowest_holes[i] = cols_holes[-1]    # 最も低い穴の位置配列
             else:
                 highest_holes[i] = -1
-                lowest_holes[i] = -1
+                lowest_holes[i] = self.height
 
         # 最も高い穴を求める
-        max_highest_hole = max(highest_holes)
+        highest_hole_height = max(highest_holes)
+
+        # 一番低い穴の高さ
+        lowest_hole_height = min(lowest_holes)
 
         ## hole_top_penaltyを穴の上のブロック数の総和に変更
         # 列ごとに切り出し
         for i in range(self.width):
             # 穴の底位置がhole_top_limit_heightより高く
             # 穴の上の地面がhole_top_limitより高いなら Penalty
-            if lowest_holes[i] > self.hole_top_limit_height and \
-                    highest_grounds[i] >= lowest_holes[i] + self.hole_top_limit:
+            if lowest_holes[i] != self.height and lowest_holes[i] > self.hole_top_limit_height and highest_grounds[i] >= lowest_holes[i] + self.hole_top_limit:
                 hole_top_penalty += highest_grounds[i] - (lowest_holes[i])
             # これは、穴の上の積み上げ数ではなく、穴の上の積み上げ高さになる。穴が多くても、ペナルティは一緒。天井が消されれば、ペナルティが一気に減るからいい方向
             """
@@ -908,7 +910,7 @@ class Block_Controller(object):
             # print("==")
         """
 
-        return num_holes, hole_top_penalty, max_highest_hole
+        return num_holes, hole_top_penalty, highest_hole_height, lowest_hole_height
 
     ####################################
     # 現状状態の各種パラメータ取得 (MLP
@@ -955,7 +957,7 @@ class Block_Controller(object):
     ####################################
     # 左端以外埋まっているか？
     ####################################
-    def get_tetris_fill_reward(self, reshape_board, piece_id):
+    def get_tetris_fill_reward(self, reshape_board, piece_id, lowest_hole_height):
         # 無効の場合
         if self.tetris_fill_height == 0:
             return 0
@@ -1425,12 +1427,12 @@ class Block_Controller(object):
         # でこぼこ度, 高さ合計, 高さ最大, 高さ最小を求める
         bampiness, total_height, max_height, min_height, left_side_height, min_height_l = self.get_bumpiness_and_height(reshape_board)
         # max_height = self.get_max_height(reshape_board)
-        # 穴の数, 穴の上積み上げ Penalty, 最も高い穴の位置を求める
-        hole_num, hole_top_penalty, max_highest_hole = self.get_holes(reshape_board, min_height)
+        # 穴の数, 穴の上積み上げ Penalty, 最も高い穴の位置, 一番下の穴の高さを求める
+        hole_num, hole_top_penalty, highest_hole_height, lowest_hole_height = self.get_holes(reshape_board, min_height)
         # 左端あけた形状の報酬計算
-        tetris_reward = self.get_tetris_fill_reward(reshape_board, hold_piece_id)
+        tetris_reward = self.get_tetris_fill_reward(reshape_board, hold_piece_id, lowest_hole_height)
         # 消せるセルの確認
-        lines_cleared, reshape_board = self.check_cleared_rows(reshape_board)
+        lines_cleared, line_cleared_reshape_board = self.check_cleared_rows(reshape_board)
         
         ## ホールドしているテトリミノ計上の報酬計算　と思ったが、保持しているものがI型の時の左端開けた場合の報酬を上げるようにする。
 
@@ -1459,16 +1461,17 @@ class Block_Controller(object):
             reward += 0.1
         """
 
+        # Retry14 下記の条件式で、andを&にしていたバグを修正
         # 以下は、左空けしてよい高さ以下の場合に計算 Retry07
         if max_height < self.tetris_fill_height:
 
             #   左側に置く高さ以下の時に、Iミノの水平置きは禁止。
             # curr_shapeがIで、direction0が水平で、かつ、holdしているものがIでなければ、ペナルティにする。
-            if hold_piece_id != 1 & curr_piece_id == 1 & direction0 == 0:
+            if hold_piece_id != 1 and curr_piece_id == 1 and direction0 == 0:
                 reward -= 0.01
 
             # 落としたのがI型で、クリア行数が3未満の場合に、I型をホールドしていなければ、ペナルティ
-            if hold_piece_id != 1 & curr_piece_id == 1 & lines_cleared < 3:
+            if hold_piece_id != 1 and curr_piece_id == 1 and lines_cleared < 3:
                 reward -= 0.01
 
         """
@@ -1489,9 +1492,10 @@ class Block_Controller(object):
             reward += self.reward_weight[0] / bampiness
         """
 
+        # Retry14 穴の位置より上の高さをバツにする。
         # 最大高さ罰　->　最大高さを超えた差分に比例するように変更。ここだけ罰
-        if max_height > self.max_height_relax:
-            reward -= self.reward_weight[1] * max(0, max_height-self.max_height_relax)
+        if max_height > min(self.max_height_relax, lowest_hole_height):
+            reward -= self.reward_weight[1] * (max_height - min(self.max_height_relax, lowest_hole_height))
         """
         # 最大高さ　->　最大高さを超えていなければ、報酬。比例させると低いほど報酬が高くなるので固定値
         if max_height < self.max_height_relax:
@@ -1519,9 +1523,16 @@ class Block_Controller(object):
 ##        if left_side_height == 0:   # 左端が埋まっていない時だけ報酬を与える。・・・これをすると、穴埋めするとき報酬が下がることになるのでよくない。
 ##            reward += tetris_reward * self.tetris_fill_reward
 
+        # Retry14 左端が埋まっているバツについては、穴の位置より低いところで埋めている場合にバツにする
+        # 穴がない場合は、埋まっているだけでバツにする。なお、低い位置ほどバツを強くする。
+        # つまり、穴より高い位置で埋まっていることだけを許す。
+        if left_side_height > 0 and lowest_hole_height != self.height and left_side_height <= lowest_hole_height:
+            reward -= (self.height - left_side_height) * self.left_side_height_penalty
+        """
         # 左端が高すぎる場合の罰
         if left_side_height > self.bumpiness_left_side_relax:
             reward -= (left_side_height - self.bumpiness_left_side_relax) * self.left_side_height_penalty
+        """
         """
         ## 左端が高すぎる場合の罰。ただし、max高さが高さ制限を超えたらペナルティなしにする。
         if left_side_height > self.bumpiness_left_side_relax & max_height < self.max_height_relax:
@@ -1984,7 +1995,7 @@ class Block_Controller(object):
                 # ボードを２次元化
                 reshape_board = self.get_reshape_backboard(curr_backboard)
                 # 最も高い穴の位置を求める
-                _, _, max_highest_hole = self.get_holes(reshape_board, -1)
+                _, _, max_highest_hole, _ = self.get_holes(reshape_board, -1)
                 # model2 切り替え条件
                 if max_highest_hole < self.predict_weight2_enable_index:
                     self.weight2_enable = True
