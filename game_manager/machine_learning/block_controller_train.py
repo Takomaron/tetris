@@ -1434,11 +1434,12 @@ class Block_Controller(object):
         # 消せるセルの確認
         lines_cleared, line_cleared_reshape_board = self.check_cleared_rows(reshape_board)
 
+        #Retry15で下記をやったが、あまり効果がなかったので、穴などの変化量を求めることにする。
         #よくわからないのだが、報酬の計算をラインを消す前に行っている。これはなぜなのだろうか。凸凹度などほとんどの報酬が変わるはず。
         # ラインを消した後のでこぼこ度, 高さ合計, 高さ最大, 高さ最小を求める
-        bampiness, total_height, max_height, min_height, left_side_height, min_height_l = self.get_bumpiness_and_height(line_cleared_reshape_board)
+        nx_bampiness, _, _, nx_min_height, _, _ = self.get_bumpiness_and_height(line_cleared_reshape_board)
         # ラインを消した後の穴の数, 穴の上積み上げ Penalty, 最も高い穴の位置, 一番下の穴の高さを求める
-        hole_num, hole_top_penalty, highest_hole_height, lowest_hole_height = self.get_holes(line_cleared_reshape_board, min_height)
+        nx_hole_num, nx_hole_top_penalty, _, _ = self.get_holes(line_cleared_reshape_board, nx_min_height)
 
         ## ホールドしているテトリミノ計上の報酬計算　と思ったが、保持しているものがI型の時の左端開けた場合の報酬を上げるようにする。
 
@@ -1450,10 +1451,18 @@ class Block_Controller(object):
         # ■これをすればいいかも、穴数とか、減っている場合は報酬＋
         # ■■この式は、行削除に伴う報酬減を相殺するためのものだ。たとえば、左端空け行数によるtetris_rewardを補充するもの
         #　Retry09なら、tetris_rewardは0.006になるので、それ以上加算できないと、報酬増にならない。
+        """
         if lines_cleared == 4:
             reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height))/self.height_line_reward)
         else:
             reward = self.reward_list[lines_cleared] * (1 + max(0, self.height - 4 - max(0, max_height))/self.height_line_reward)
+        """
+
+        # Rerty16 穴がない限り、左端以外が4行超えない限り削除報酬をゼロにする
+        if min_height_l <= 4 and lowest_hole_height > 4:
+            lines_cleared = 0
+        reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height))/self.height_line_reward)
+
         """
         reward = self.reward_list[lines_cleared]    # 0-1に正規化されている。
         reward += (self.height - max(0, max_height))/self.height_line_reward
