@@ -814,6 +814,10 @@ class Block_Controller(object):
 
         # 差分の絶対値を合計してでこぼこ度とする
         total_bumpiness = np.sum(diffs)
+
+        # Retry17 上記の計算だけだと階段状の場合に凸凹度が低くなるので、さらに高低差を加える。
+        total_bunpiness += (max_height - min_height_l)
+
         return total_bumpiness, total_height, max_height, min_height, heights[0], min_height_l
 
     ####################################
@@ -1437,9 +1441,10 @@ class Block_Controller(object):
         #Retry15で下記をやったが、あまり効果がなかったので、穴などの変化量を求めることにする。
         #よくわからないのだが、報酬の計算をラインを消す前に行っている。これはなぜなのだろうか。凸凹度などほとんどの報酬が変わるはず。
         # ラインを消した後のでこぼこ度, 高さ合計, 高さ最大, 高さ最小を求める
-        nx_bampiness, _, _, nx_min_height, _, _ = self.get_bumpiness_and_height(line_cleared_reshape_board)
+        # Retry17 左端高さはライン消し後のデータを使う　∵Iミノをおとしたとき狙い通りなら左端高さが４になってしまう。
+        nx_bampiness, _, nx_max_height, nx_min_height, nx_left_side_height, nx_min_height_l = self.get_bumpiness_and_height(line_cleared_reshape_board)
         # ラインを消した後の穴の数, 穴の上積み上げ Penalty, 最も高い穴の位置, 一番下の穴の高さを求める
-        nx_hole_num, nx_hole_top_penalty, _, _ = self.get_holes(line_cleared_reshape_board, nx_min_height)
+        nx_hole_num, nx_hole_top_penalty, _, nx_lowest_hole_height = self.get_holes(line_cleared_reshape_board, nx_min_height)
 
         ## ホールドしているテトリミノ計上の報酬計算　と思ったが、保持しているものがI型の時の左端開けた場合の報酬を上げるようにする。
 
@@ -1458,11 +1463,29 @@ class Block_Controller(object):
             reward = self.reward_list[lines_cleared] * (1 + max(0, self.height - 4 - max(0, max_height))/self.height_line_reward)
         """
 
+        """
+        #しまった、下記の計算では、Scoreが正しく計算されない。
         # Rerty16 穴がない限り、左端以外が4行超えない限り削除報酬をゼロにする
+            # だめか、穴を作れば報酬が増えることになる。
         if min_height_l <= 4 and lowest_hole_height > 4:
             lines_cleared = 0
         reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height))/self.height_line_reward)
+        """
+        # Retry17 左端空けの高さより低いときに、4段消し以外をした場合は、報酬は半減
+        reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, nx_max_height))/self.height_line_reward)
 
+        if min_height_l < self.bumpiness_left_side_relax and lines_cleared != 4:
+            reward /= 2
+
+        """
+        # 穴がない限り、左端以外が4行超えない限り削除報酬をゼロにする
+            # だめか、穴を作れば報酬が増えることになる。
+        if min_height_l <= 4 and lowest_hole_height > 4:
+            reward = 0
+        else:
+            reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height))/self.height_line_reward)
+        """
+    
         """
         reward = self.reward_list[lines_cleared]    # 0-1に正規化されている。
         reward += (self.height - max(0, max_height))/self.height_line_reward
@@ -1500,7 +1523,7 @@ class Block_Controller(object):
         # reward += 0.01
         # 形状の罰報酬
         # でこぼこ度罰
-        reward -= self.reward_weight[0] * bampiness
+        reward -= self.reward_weight[0] * nx_bampiness  # Retry17 ラインクリア後に変更
         """
         # 凸凹度が低ければ報酬＋
         if bampiness:
@@ -1509,15 +1532,18 @@ class Block_Controller(object):
 
         # Retry14 穴の位置より上の高さをバツにする。
         # 最大高さ罰　->　最大高さを超えた差分に比例するように変更。ここだけ罰
-        if max_height > min(self.max_height_relax, lowest_hole_height):
-            reward -= self.reward_weight[1] * (max_height - min(self.max_height_relax, lowest_hole_height))
+        # Retry17 削除後の状態の変数に変更。穴の位置が低いときに削除を低い位置でしないか心配■
+        if nx_max_height > min(self.max_height_relax, nx_lowest_hole_height):
+            reward -= self.reward_weight[1] * (nx_max_height - min(self.max_height_relax, nx_lowest_hole_height))
         """
         # 最大高さ　->　最大高さを超えていなければ、報酬。比例させると低いほど報酬が高くなるので固定値
         if max_height < self.max_height_relax:
             reward += self.reward_weight[1]
         """
         # 穴の数罰
-        reward -= self.reward_weight[2] * hole_num
+##      reward -= self.reward_weight[2] * hole_num
+        if hole_num <= nx_hole_num: # Retry17 穴の数が減らない場合にペナルティを与える
+            reward -= self.reward_weight[2] * nx_hole_num
         """
         # 穴の数が少なければ、少ないだけ報酬
         if hole_num:
@@ -1526,7 +1552,9 @@ class Block_Controller(object):
         # 穴の上のブロック数罰
 ##        reward -= self.hole_top_limit_reward * hole_top_penalty * max_highest_hole
         ## hole_top_penaltyの計算式を総数にしたので、こちらの式も変える
-        reward -= self.hole_top_limit_reward * hole_top_penalty
+##        reward -= self.hole_top_limit_reward * hole_top_penalty
+        if hole_top_penalty <= nx_hole_top_penalty: # Retry17 穴上罰が減らない場合にペナルティを与える
+            reward -= self.hole_top_limit_reward * nx_hole_top_penalty
         """
         # 穴の上のブロック数が少なければ少ないだけ報酬
         if max_highest_hole:
@@ -1541,8 +1569,10 @@ class Block_Controller(object):
         # Retry14 左端が埋まっているバツについては、穴の位置より低いところで埋めている場合にバツにする
         # 穴がない場合は、埋まっているだけでバツにする。なお、低い位置ほどバツを強くする。
         # つまり、穴より高い位置で埋まっていることだけを許す。
-        if left_side_height > 0 and lowest_hole_height != self.height and left_side_height <= lowest_hole_height:
-            reward -= (self.height - left_side_height) * self.left_side_height_penalty
+        #■下記の式は、ラインをクリアした後ではないとすれば、Iミノを落とした時左端の高さが高くなってペナルティになるじゃん。
+        if nx_left_side_height > 0 and nx_lowest_hole_height != self.height \
+            and nx_left_side_height <= nx_lowest_hole_height:
+            reward -= (self.height - nx_left_side_height) * self.left_side_height_penalty
         """
         # 左端が高すぎる場合の罰
         if left_side_height > self.bumpiness_left_side_relax:
