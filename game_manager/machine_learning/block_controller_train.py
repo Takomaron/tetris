@@ -978,6 +978,7 @@ class Block_Controller(object):
         # 配列maskで、軸1の方向で足し算する。その行で埋まっている数を計算
         # print(sum_)
 
+        """ Retry18でコメントアウト
         # line (1 - self.tetris_fill_height)段目の左端以外そろっているか
         for i in range(1, self.tetris_fill_height):
             # そろっている段ごとに報酬。掛け算で低い行でたくさんそろっているのを報酬高く。
@@ -986,6 +987,17 @@ class Block_Controller(object):
                 # 1段目は2倍    バグってた。そろってなくてもreward +5になってた。
                 if i == 1:
                     reward += 2
+        """
+        # Retry18
+        for i in range(1, self.height):
+            # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
+            if reshape_board[self.height - i][0] == 0:
+                # 高さがtetris fill height未満の間だけ報酬を加算する。
+                if self.get_line_right_fill(reshape_board, sum_, i):
+                    reward += 1
+            else:   # 左端が埋まってたら報酬０
+                reward = 0
+                break   # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
         """
         for i in range(1, self.height):
             # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
@@ -1445,6 +1457,8 @@ class Block_Controller(object):
         nx_bampiness, _, nx_max_height, nx_min_height, nx_left_side_height, nx_min_height_l = self.get_bumpiness_and_height(line_cleared_reshape_board)
         # ラインを消した後の穴の数, 穴の上積み上げ Penalty, 最も高い穴の位置, 一番下の穴の高さを求める
         nx_hole_num, nx_hole_top_penalty, _, nx_lowest_hole_height = self.get_holes(line_cleared_reshape_board, nx_min_height)
+        # Retry18 ラインを消した後の、左端あけた形状の報酬計算
+        nx_tetris_reward = self.get_tetris_fill_reward(line_cleared_reshape_board, hold_piece_id, nx_lowest_hole_height)
 
         ## ホールドしているテトリミノ計上の報酬計算　と思ったが、保持しているものがI型の時の左端開けた場合の報酬を上げるようにする。
 
@@ -1471,11 +1485,51 @@ class Block_Controller(object):
             lines_cleared = 0
         reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, max_height))/self.height_line_reward)
         """
-        # Retry17 左端空けの高さより低いときに、4段消し以外をした場合は、報酬は半減
+
+        # 下記のrewardは、ラインを消した時以外は0である。        
         reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0, nx_max_height))/self.height_line_reward)
 
+        """ Retry18 でコメントアウト
+        # Retry17 左端空けの高さより低いときに、4段消し以外をした場合は、報酬は半減
         if min_height_l < self.bumpiness_left_side_relax and lines_cleared != 4:
             reward /= 2
+        """
+
+        """ Retry18
+        4段消しをしてほしい。
+        4段消しのため左端だけ空いた状態を作ってほしい。
+        ある程度の高さを超えたら、ゲームオーバーを防ぐために高さを下げる行動をしてほしい。
+        穴は作らないでほしい
+        穴を作ったら早く消してほしい。
+
+        ・クリア前の盤面で、4段以下で、穴がなければ、穴を作らずに、左を開けて積み上げて。
+            -> 高さが減ったらペナルティ
+        ・クリア前の盤面で、4段以下で、穴があれば、穴を埋めて。
+            -> 穴があればペナルティ、穴が増えたらペナルティ、穴が減ったら報酬（穴数ペナルティが減る）
+        ・クリア前の盤面で、4段以上で、テトリスできるならテトリスして
+            -> 削除行数が4
+        ・クリア前の盤面で、4段以上で、テトリスできないなら、4段以下と同じ
+            -> 削除行数が4でない
+        ・クリア前の盤面で、高さがやばければ、高さを下げて。
+
+        ネガティブブランチ：
+            削除報酬が+になる高さ以上で、1行消しとかをすれば、報酬が上がる。
+                -> 4段以下が左端空け状態でなければ、報酬を与えない。
+        """
+        if max_height > self.max_height_relax: # やばい高さよりたかい
+            reward /= 10    # ネガティブブランチになるかもしれないが報酬を与える・・・LV3に必要な報酬
+        else:
+            if tetris_reward >= 4:  # クリア前盤面が下から4行以上左端が空いている。
+                if min_height_l >= 4 and lines_cleared != 4 or min_height_l < 4:
+                    if hole_num:  # 穴がある場合
+                        if hole_num <= nx_hole_num:  # 穴数が変わらないか増えたら報酬なし。穴を消したら報酬あり。
+                            reward = 0
+                        elif hole_top_penalty <= nx_hole_top_penalty:   # 穴の上罰が増えても報酬なし。
+                            reward = 0
+                    elif lines_cleared:   # 穴がないのに、テトリスできないのにラインを消したら報酬なし
+                        reward = 0
+            else:   # 4段消しできない場合
+                reward = 0  # 削除できていないのと同じ
 
         """
         # 穴がない限り、左端以外が4行超えない限り削除報酬をゼロにする
@@ -1499,6 +1553,7 @@ class Block_Controller(object):
             reward += 0.1
         """
 
+        """ Retry18 で削除
         # Retry14 下記の条件式で、andを&にしていたバグを修正
         # 以下は、左空けしてよい高さ以下の場合に計算 Retry07
         if max_height < self.tetris_fill_height:
@@ -1511,6 +1566,7 @@ class Block_Controller(object):
             # 落としたのがI型で、クリア行数が3未満の場合に、I型をホールドしていなければ、ペナルティ
             if hold_piece_id != 1 and curr_piece_id == 1 and lines_cleared < 3:
                 reward -= 0.01
+        """
 
         """
 #       左端を除いた最低高さが4以下の場合は低い分だけペナルティ
@@ -1523,49 +1579,41 @@ class Block_Controller(object):
         # reward += 0.01
         # 形状の罰報酬
         # でこぼこ度罰
+        """ # Retry18でコメントアウト
         reward -= self.reward_weight[0] * nx_bampiness  # Retry17 ラインクリア後に変更
         """
-        # 凸凹度が低ければ報酬＋
-        if bampiness:
-            reward += self.reward_weight[0] / bampiness
-        """
+        # Retry18 ラインのクリア後、凸凹度が増えるかもしれない。これより、穴系のペナルティのほうが上でなければならない。
+        # 計算が面倒なので、穴系のペナルティが減らないときだけ、凸凹度罰を与える。
+        if hole_num <= nx_hole_num or hole_top_penalty <= nx_hole_top_penalty:
+            reward -= self.reward_weight[0] * nx_bampiness  # Retry17 ラインクリア後に変更
 
         # Retry14 穴の位置より上の高さをバツにする。
-        # 最大高さ罰　->　最大高さを超えた差分に比例するように変更。ここだけ罰
         # Retry17 削除後の状態の変数に変更。穴の位置が低いときに削除を低い位置でしないか心配■
         if nx_max_height > min(self.max_height_relax, nx_lowest_hole_height):
             reward -= self.reward_weight[1] * (nx_max_height - min(self.max_height_relax, nx_lowest_hole_height))
         """
-        # 最大高さ　->　最大高さを超えていなければ、報酬。比例させると低いほど報酬が高くなるので固定値
-        if max_height < self.max_height_relax:
-            reward += self.reward_weight[1]
+        ## 最大高さ罰
+        if max_height > self.max_height_relax:
+            reward -= self.reward_weight[1] * max(0,max_height)
         """
         # 穴の数罰
 ##      reward -= self.reward_weight[2] * hole_num
         if hole_num <= nx_hole_num: # Retry17 穴の数が減らない場合にペナルティを与える
             reward -= self.reward_weight[2] * nx_hole_num
-        """
-        # 穴の数が少なければ、少ないだけ報酬
-        if hole_num:
-            reward += self.reward_weight[2] / hole_num
-        """
+
         # 穴の上のブロック数罰
 ##        reward -= self.hole_top_limit_reward * hole_top_penalty * max_highest_hole
         ## hole_top_penaltyの計算式を総数にしたので、こちらの式も変える
 ##        reward -= self.hole_top_limit_reward * hole_top_penalty
         if hole_top_penalty <= nx_hole_top_penalty: # Retry17 穴上罰が減らない場合にペナルティを与える
             reward -= self.hole_top_limit_reward * nx_hole_top_penalty
-        """
-        # 穴の上のブロック数が少なければ少ないだけ報酬
-        if max_highest_hole:
-            reward += self.hole_top_limit_reward * hole_top_penalty / max_highest_hole
-        """
 
         # 左端以外埋めている状態報酬
-        reward += tetris_reward * self.tetris_fill_reward
+        reward += nx_tetris_reward * self.tetris_fill_reward
 ##        if left_side_height == 0:   # 左端が埋まっていない時だけ報酬を与える。・・・これをすると、穴埋めするとき報酬が下がることになるのでよくない。
 ##            reward += tetris_reward * self.tetris_fill_reward
 
+        """ Retry18 左端が高すぎる場合の罰は、左端が埋まっている場合に報酬を与えないことにしたので、いったん、コメントアウトする
         # Retry14 左端が埋まっているバツについては、穴の位置より低いところで埋めている場合にバツにする
         # 穴がない場合は、埋まっているだけでバツにする。なお、低い位置ほどバツを強くする。
         # つまり、穴より高い位置で埋まっていることだけを許す。
@@ -1574,23 +1622,10 @@ class Block_Controller(object):
             and nx_left_side_height <= nx_lowest_hole_height:
             reward -= (self.height - nx_left_side_height) * self.left_side_height_penalty
         """
+        """
         # 左端が高すぎる場合の罰
         if left_side_height > self.bumpiness_left_side_relax:
             reward -= (left_side_height - self.bumpiness_left_side_relax) * self.left_side_height_penalty
-        """
-        """
-        ## 左端が高すぎる場合の罰。ただし、max高さが高さ制限を超えたらペナルティなしにする。
-        if left_side_height > self.bumpiness_left_side_relax & max_height < self.max_height_relax:
-            reward -= (left_side_height - self.bumpiness_left_side_relax) * self.left_side_height_penalty
-        """
-        """
-       上記の報酬は改造後のtetris_reward内でまかなわれる。しかし、もとのtetris_rewardそのままで、
-       左端高さが0以外なら報酬出さないようにしてもよかった。
-        """
-        """
-        #★ ペナルティは普通に計算させる。4列消したらreward 1固定。ペナルティ無し。
-        if lines_cleared == 4:
-            reward = 1
         """
 
         self.epoch_reward += reward
