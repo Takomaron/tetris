@@ -1527,13 +1527,13 @@ class Block_Controller(object):
                     if hole_num:  # 穴がある場合
                         if hole_num <= nx_hole_num or hole_top_penalty <= nx_hole_top_penalty:
                             # 穴数や穴の上罰が変わらないか増えたら消した行数分ペナルティ
-                            reward = -reward
+                            reward = 0
                         # 上記以外は、どちらか減っているから報酬あり。
                     else: # lines_cleared:   # 穴がないのに、テトリスできないのにラインを消したら消した行数分ペナルティ
-                        reward = -reward
+                        reward = 0
             else:   # 4段消しできない場合、ネガティブブランチ防止のため、報酬を与えない。ペナルティは減るはず。
                 if lines_cleared: # テトリスできないのに消したら次に困るので、消した行数分ペナルティ
-                    reward = -reward
+                    reward = 0
                 else:
                     reward = 0  # 削除できていないのと同じ。この行はなくても結果は変わらない。
             """ 以下は間違っている
