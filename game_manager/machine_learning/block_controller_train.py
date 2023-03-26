@@ -1631,8 +1631,15 @@ class Block_Controller(object):
         """ Retry18 コメントアウト
         reward += nx_tetris_reward * self.tetris_fill_reward
         """
+        """ Retry19 コメントアウト
         # Retry18 左空け報酬が1行消しより大きいと消さなくなるので、1行消しのmin報酬でクリッピングする
         reward += min(nx_tetris_reward * self.tetris_fill_reward, self.reward_list[1])
+        """
+        # Retry19 クリッピングを変える。やばい高さの時は1行。それ以外はクリッピングなし。
+        if max_height > self.max_height_relax:
+            reward += min(nx_tetris_reward * self.tetris_fill_reward, self.reward_list[1])
+        else:
+            reward += nx_tetris_reward * self.tetris_fill_reward
 
 ##        if left_side_height == 0:   # 左端が埋まっていない時だけ報酬を与える。・・・これをすると、穴埋めするとき報酬が下がることになるのでよくない。
 ##            reward += tetris_reward * self.tetris_fill_reward
