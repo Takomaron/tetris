@@ -1517,19 +1517,38 @@ class Block_Controller(object):
                 -> 4段以下が左端空け状態でなければ、報酬を与えない。
         """
         if max_height > self.max_height_relax: # やばい高さよりたかい
+        #   ■ここに、ペナルティが一定値以上の場合も加えたほうがいいかもしれない。
+        #   すなわち、一定以下の高さやペナルティの値にするまで、高さを下げることを優先する。
+        # 　■それは、別のロジックにしたほうがいいのかもしれない。うまくいかなかったらそうしよう。
             reward /= 10    # ネガティブブランチになるかもしれないが報酬を与える・・・LV3に必要な報酬
         else:
+            if tetris_reward >= 4:  # クリア前盤面が下から4行以上左端が空いている。= Iミノを落とせば4段消しできる。
+                if lines_cleared != 4:
+                    if hole_num:  # 穴がある場合
+                        if hole_num <= nx_hole_num or hole_top_penalty <= nx_hole_top_penalty:
+                            # 穴数や穴の上罰が変わらないか増えたら消した行数分ペナルティ
+                            reward = -reward
+                        # 上記以外は、どちらか減っているから報酬あり。
+                    else: # lines_cleared:   # 穴がないのに、テトリスできないのにラインを消したら消した行数分ペナルティ
+                        reward = -reward
+            else:   # 4段消しできない場合、ネガティブブランチ防止のため、報酬を与えない。ペナルティは減るはず。
+                if lines_cleared: # テトリスできないのに消したら次に困るので、消した行数分ペナルティ
+                    reward = -reward
+                else:
+                    reward = 0  # 削除できていないのと同じ。この行はなくても結果は変わらない。
+            """ 以下は間違っている
             if tetris_reward >= 4:  # クリア前盤面が下から4行以上左端が空いている。
-                if min_height_l >= 4 and lines_cleared != 4 or min_height_l < 4:
+                if (min_height_l >= 4 and lines_cleared != 4) or min_height_l < 4:
                     if hole_num:  # 穴がある場合
                         if hole_num <= nx_hole_num:  # 穴数が変わらないか増えたら報酬なし。穴を消したら報酬あり。
                             reward = 0
                         elif hole_top_penalty <= nx_hole_top_penalty:   # 穴の上罰が増えても報酬なし。
                             reward = 0
-                    elif lines_cleared:   # 穴がないのに、テトリスできないのにラインを消したら報酬なし
+                    else: # lines_cleared:   # 穴がないのに、テトリスできないのにラインを消したら報酬なし
                         reward = 0
             else:   # 4段消しできない場合
                 reward = 0  # 削除できていないのと同じ
+            """
 
         """
         # 穴がない限り、左端以外が4行超えない限り削除報酬をゼロにする
@@ -1609,7 +1628,12 @@ class Block_Controller(object):
             reward -= self.hole_top_limit_reward * nx_hole_top_penalty
 
         # 左端以外埋めている状態報酬
+        """ Retry18 コメントアウト
         reward += nx_tetris_reward * self.tetris_fill_reward
+        """
+        # Retry18 左空け報酬が1行消しより大きいと消さなくなるので、1行消しのmin報酬でクリッピングする
+        reward += min(nx_tetris_reward * self.tetris_fill_reward, self.reward_list[1])
+
 ##        if left_side_height == 0:   # 左端が埋まっていない時だけ報酬を与える。・・・これをすると、穴埋めするとき報酬が下がることになるのでよくない。
 ##            reward += tetris_reward * self.tetris_fill_reward
 
