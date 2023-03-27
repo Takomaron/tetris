@@ -992,6 +992,7 @@ class Block_Controller(object):
         # Retry18
         for i in range(1, self.height):
         """
+        """ Retry22 コメントアウト
         not_fill_flg = False  # Retry21
         # 高さがtetris fill height未満の間だけ報酬を加算する。
         for i in range(1, self.tetris_fill_height):
@@ -1001,6 +1002,23 @@ class Block_Controller(object):
                     reward += 1
                 else:
                     not_fill_flg = True# 左端だけが開いている状態でなければそこで報酬ストップ
+            else:   # 左端が埋まってたら報酬０
+                reward = 0
+                break   # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
+        """
+        # Retry22
+        filling_up_flg = True
+        # 高さがtetris fill height未満の間だけ報酬を加算する。
+        for i in range(1, self.tetris_fill_height):
+            # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
+            if reshape_board[self.height - i][0] == 0:
+                if self.get_line_right_fill(reshape_board, sum_, i) and filling_up_flg:
+                    reward += 1
+                else:
+                    filling_up_flg = False  # 左端だけが開いている状態でなければそこで報酬ストップ
+            # 全幅埋まっていれば、Iミノを落とした場合の状況なので、報酬加算を継続
+            elif (self.height - i < 4) and sum_[self.height - i] == self.width and filling_up_flg:
+                reward += 1
             else:   # 左端が埋まってたら報酬０
                 reward = 0
                 break   # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
@@ -1522,14 +1540,14 @@ class Block_Controller(object):
             削除報酬が+になる高さ以上で、1行消しとかをすれば、報酬が上がる。
                 -> 4段以下が左端空け状態でなければ、報酬を与えない。
         """
-        NG_RATIO = 5
+        NG_RATIO = 10
         if max_height > self.max_height_relax: # やばい高さよりたかい
         #   ■ここに、ペナルティが一定値以上の場合も加えたほうがいいかもしれない。
         #   すなわち、一定以下の高さやペナルティの値にするまで、高さを下げることを優先する。
         # 　■それは、別のロジックにしたほうがいいのかもしれない。うまくいかなかったらそうしよう。
             reward /= NG_RATIO    # ネガティブブランチになるかもしれないが報酬を与える・・・LV3に必要な報酬
         else:
-            # ミス。下記は、Iミノを落とすと、0になってしまう。これが、落とさない理由。
+            # ミス。下記は、Iミノを落とすと、0になってしまう。これが、落とさない理由。Retry22で修正したが、影響ないはずなのでそのままにしておく。
             if tetris_reward >= 4 or lines_cleared == 4:  # クリア前盤面が下から4行以上左端が空いている。か、Iミノを落として4段消しできる。
                 if lines_cleared != 4:  # 4段消ししていない
                     if hole_num:  # 穴がある場合
