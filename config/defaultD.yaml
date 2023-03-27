@@ -52,7 +52,7 @@ train:
     - 1600  #5000   3block
     - 10000 #10000  4block ■ブロックと書かれているが、消せる行数に相当する報酬として使われている。:★10000
     - -10000 #-10000 game over
-  height_line_reward: 10 #★833触らない 3	低いところの消去ほど有効とする設定(10000 くらいでほぼ無効 大きい値ほど報酬小さい)
+  height_line_reward: 6 #★833触らない 3	低いところの消去ほど有効とする設定(10000 くらいでほぼ無効 大きい値ほど報酬小さい)
   reward_weight: # 形状報酬の配分
     - 0.0005 #0.0005 1 #bampiness 
     - 0.01 #0.01 1 #max height
@@ -68,7 +68,7 @@ train:
   hole_top_limit_height: -1 # 5 穴の上の積み上げペナルティ下限絶対高さ、この高さより上のときのみペナルティ有効 (22: 無効, -1:制限なし)
   hole_top_limit: 1 # 1 穴の上の積み上げペナルティ 穴の位置が左記の相対高さより高いときのみ
 
-  move_down_flag: 1 # 0 Move Down 有効化 #DQN限定
+  move_down_flag: 0 # 0 Move Down 有効化 #DQN限定
 
   #predict_next_flag: 1 # 1 次のテトリミノ予測有効化 # 20220831 無効
   predict_next_num: 4 # 0 次のテトリミノ予測数 (0: 無効) #DQN限定 ■4まではOKらしい
