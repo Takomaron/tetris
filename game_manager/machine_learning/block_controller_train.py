@@ -1516,26 +1516,50 @@ class Block_Controller(object):
             削除報酬が+になる高さ以上で、1行消しとかをすれば、報酬が上がる。
                 -> 4段以下が左端空け状態でなければ、報酬を与えない。
         """
+        NG_RATIO = 10
         if max_height > self.max_height_relax: # やばい高さよりたかい
         #   ■ここに、ペナルティが一定値以上の場合も加えたほうがいいかもしれない。
         #   すなわち、一定以下の高さやペナルティの値にするまで、高さを下げることを優先する。
         # 　■それは、別のロジックにしたほうがいいのかもしれない。うまくいかなかったらそうしよう。
-            reward /= 10    # ネガティブブランチになるかもしれないが報酬を与える・・・LV3に必要な報酬
+            reward /= NG_RATIO    # ネガティブブランチになるかもしれないが報酬を与える・・・LV3に必要な報酬
         else:
             if tetris_reward >= 4:  # クリア前盤面が下から4行以上左端が空いている。= Iミノを落とせば4段消しできる。
-                if lines_cleared != 4:
+                if lines_cleared != 4:  # 4段消ししていない
                     if hole_num:  # 穴がある場合
                         if hole_num <= nx_hole_num or hole_top_penalty <= nx_hole_top_penalty:
                             # 穴数や穴の上罰が変わらないか増えたら消した行数分ペナルティ
-                            reward = 0
+                            reward /= NG_RATIO
+                                
+                            # Retry20 Iミノ放出ペナルティ
+                            if curr_piece_id == 1 and hold_piece_id != 1:
+                                reward -= self.tetris_fill_reward
+
                         # 上記以外は、どちらか減っているから報酬あり。
-                    else: # lines_cleared:   # 穴がないのに、テトリスできないのにラインを消したら消した行数分ペナルティ
-                        reward = 0
+                    else: # lines_cleared:   # 穴がないのに、テトリスできないのにラインを消したら消した行数分ペナルティ・・・全然ダメだったのでペナルティはやめた。
+                        reward /= NG_RATIO
+                        
+                        # Retry20 Iミノ放出ペナルティ
+                        if curr_piece_id == 1 and hold_piece_id != 1:
+                            reward -= self.tetris_fill_reward
+
+                    if hold_piece_id == 1:  # Retry20 4段消しできないときにIミノホールドしていたら報酬。
+                        reward += self.tetris_fill_reward
+
             else:   # 4段消しできない場合、ネガティブブランチ防止のため、報酬を与えない。ペナルティは減るはず。
-                if lines_cleared: # テトリスできないのに消したら次に困るので、消した行数分ペナルティ
-                    reward = 0
+                # Retry20 Iミノホールド報酬
+                # 落としたのがI型で、I型をホールドしていなければ、4行消しできない差分をペナルティと思ったが、大きすぎるので左空け報酬にした。
+                if curr_piece_id == 1 and hold_piece_id != 1:
+                    reward -= self.tetris_fill_reward
+                if hold_piece_id == 1:  # Retry20 4段消しできないときにIミノホールドしていたら報酬。
+                    reward += self.tetris_fill_reward
+
+                if lines_cleared: # テトリスできないのに消したら次に困るので、消した行数分ペナルティ・・・全然ダメだったのでペナルティはやめた。
+                    reward /= NG_RATIO
                 else:
-                    reward = 0  # 削除できていないのと同じ。この行はなくても結果は変わらない。
+                    reward /= NG_RATIO  # 削除できていないのと同じ。この行はなくても結果は変わらない。
+
+
+
             """ 以下は間違っている
             if tetris_reward >= 4:  # クリア前盤面が下から4行以上左端が空いている。
                 if (min_height_l >= 4 and lines_cleared != 4) or min_height_l < 4:
