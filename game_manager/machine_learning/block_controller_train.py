@@ -988,13 +988,19 @@ class Block_Controller(object):
                 if i == 1:
                     reward += 2
         """
+        """ # Retry21で変更
         # Retry18
         for i in range(1, self.height):
+        """
+        not_fill_flg = False  # Retry21
+        # 高さがtetris fill height未満の間だけ報酬を加算する。
+        for i in range(1, self.tetris_fill_height):
             # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
             if reshape_board[self.height - i][0] == 0:
-                # 高さがtetris fill height未満の間だけ報酬を加算する。
-                if self.get_line_right_fill(reshape_board, sum_, i):
+                if self.get_line_right_fill(reshape_board, sum_, i) and (not not_fill_flg):
                     reward += 1
+                else:
+                    not_fill_flg = True# 左端だけが開いている状態でなければそこで報酬ストップ
             else:   # 左端が埋まってたら報酬０
                 reward = 0
                 break   # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
@@ -1523,12 +1529,13 @@ class Block_Controller(object):
         # 　■それは、別のロジックにしたほうがいいのかもしれない。うまくいかなかったらそうしよう。
             reward /= NG_RATIO    # ネガティブブランチになるかもしれないが報酬を与える・・・LV3に必要な報酬
         else:
-            if tetris_reward >= 4:  # クリア前盤面が下から4行以上左端が空いている。= Iミノを落とせば4段消しできる。
+            # ミス。下記は、Iミノを落とすと、0になってしまう。これが、落とさない理由。
+            if tetris_reward >= 4 or lines_cleared == 4:  # クリア前盤面が下から4行以上左端が空いている。か、Iミノを落として4段消しできる。
                 if lines_cleared != 4:  # 4段消ししていない
                     if hole_num:  # 穴がある場合
                         if hole_num <= nx_hole_num or hole_top_penalty <= nx_hole_top_penalty:
                             # 穴数や穴の上罰が変わらないか増えたら消した行数分ペナルティ
-                            reward /= NG_RATIO
+                            reward = 0
                                 
                             # Retry20 Iミノ放出ペナルティ
                             if curr_piece_id == 1 and hold_piece_id != 1:
@@ -1536,7 +1543,7 @@ class Block_Controller(object):
 
                         # 上記以外は、どちらか減っているから報酬あり。
                     else: # lines_cleared:   # 穴がないのに、テトリスできないのにラインを消したら消した行数分ペナルティ・・・全然ダメだったのでペナルティはやめた。
-                        reward /= NG_RATIO
+                        reward = 0
                         
                         # Retry20 Iミノ放出ペナルティ
                         if curr_piece_id == 1 and hold_piece_id != 1:
@@ -1554,9 +1561,9 @@ class Block_Controller(object):
                     reward += self.tetris_fill_reward
 
                 if lines_cleared: # テトリスできないのに消したら次に困るので、消した行数分ペナルティ・・・全然ダメだったのでペナルティはやめた。
-                    reward /= NG_RATIO
+                    reward = 0
                 else:
-                    reward /= NG_RATIO  # 削除できていないのと同じ。この行はなくても結果は変わらない。
+                    reward = 0  # 削除できていないのと同じ。この行はなくても結果は変わらない。
 
 
 
