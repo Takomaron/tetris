@@ -1589,7 +1589,7 @@ class Block_Controller(object):
                     reward = 0
                 else:
                     reward = 0  # 削除できていないのと同じ。この行はなくても結果は変わらない。
-
+            """ Retry24 コメントアウト
             # Retry23 Iミノホールドペナルティ　
             # 左端を除いた高さが4行以下で、落としたのがIミノで、Iミノをホールドしていなければ、左空け報酬をペナルティにする。
             if min_height_l < 4:
@@ -1597,6 +1597,7 @@ class Block_Controller(object):
                     reward += self.tetris_fill_reward
                 elif curr_piece_id == 1:
                     reward -= self.tetris_fill_reward
+            """
 
             """ 以下は間違っている
             if tetris_reward >= 4:  # クリア前盤面が下から4行以上左端が空いている。
