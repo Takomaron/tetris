@@ -1592,7 +1592,7 @@ class Block_Controller(object):
 
             # Retry23 Iミノホールドペナルティ　
             # 左端を除いた高さが4行以下で、落としたのがIミノで、Iミノをホールドしていなければ、左空け報酬をペナルティにする。
-            if nx_min_height_l < 4:
+            if min_height_l < 4:
                 if hold_piece_id == 1:  # Retry20 4段消しできないときにIミノホールドしていたら報酬。
                     reward += self.tetris_fill_reward
                 elif curr_piece_id == 1:
