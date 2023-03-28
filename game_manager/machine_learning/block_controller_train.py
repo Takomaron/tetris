@@ -1006,6 +1006,27 @@ class Block_Controller(object):
                 reward = 0
                 break   # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
         """
+        # Retry25
+        fill_up_reward = 1
+        # 高さがtetris fill height未満の間だけ報酬を加算する。
+        for i in range(1, self.tetris_fill_height):
+            # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
+            if reshape_board[self.height - i][0] == 0:  # 左端が空いている
+                if self.get_line_right_fill(reshape_board, sum_, i):    # 左端以外は埋まっている
+                    reward += fill_up_reward
+                    if i == 1:  # パラメータ間の整合をとるため、1段目はオフセットを加える
+                        reward += self.reward_list[1]/self.reward_list[4]/self.tetris_fill_reward
+                else:   # 左端以外が埋まっていない
+                    fill_up_reward = 0  # 左端だけが開いている状態でなければそこで報酬ストップ
+                                        # 0.5にしようかと思ったが、
+            # 全幅埋まっていれば、削除される行だから、報酬加算を継続・・・これにより、削除しない場合と報酬の差がなくなる。
+            elif sum_[self.height - i] == self.width:
+                reward += fill_up_reward
+            else:   # 全幅埋まっておらず、左端が埋まってたら、左端を開けている意味がないので報酬０
+                    # 報酬半減がいいかとも思ったが、とりあえず、Retry25では0
+                reward = 0
+                break   # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
+        """ Retry25で変更
         # Retry22
         filling_up_flg = True
         # 高さがtetris fill height未満の間だけ報酬を加算する。
@@ -1022,6 +1043,7 @@ class Block_Controller(object):
             else:   # 左端が埋まってたら報酬０
                 reward = 0
                 break   # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
+        """
         """
         for i in range(1, self.height):
             # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
