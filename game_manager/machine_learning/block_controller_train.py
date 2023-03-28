@@ -1554,7 +1554,7 @@ class Block_Controller(object):
                         if hole_num <= nx_hole_num or hole_top_penalty <= nx_hole_top_penalty:
                             # 穴数や穴の上罰が変わらないか増えたら消した行数分ペナルティ
                             reward = 0
-                            """ Retry22 コメントアウト
+                            """ Retry23 コメントアウト
                             # Retry20 Iミノ放出ペナルティ
                             if curr_piece_id == 1 and hold_piece_id != 1:
                                 reward -= self.tetris_fill_reward
@@ -1564,19 +1564,19 @@ class Block_Controller(object):
                     else: # lines_cleared:   # 穴がないのに、テトリスできないのにラインを消したら消した行数分ペナルティ・・・全然ダメだったのでペナルティはやめた。
                         reward = 0
                         
-                        """ Retry22 コメントアウト
+                        """ Retry23 コメントアウト
                         # Retry20 Iミノ放出ペナルティ
                         if curr_piece_id == 1 and hold_piece_id != 1:
                             reward -= self.tetris_fill_reward
                         """
 
-                    """ Retry22 コメントアウト
+                    """ Retry23 コメントアウト
                     if hold_piece_id == 1:  # Retry20 4段消しできないときにIミノホールドしていたら報酬。
                         reward += self.tetris_fill_reward
                     """
 
             else:   # 4段消しできない場合、ネガティブブランチ防止のため、報酬を与えない。ペナルティは減るはず。
-                """ Retry22 コメントアウト
+                """ Retry23 コメントアウト
                 # Retry20 Iミノホールド報酬
                 # 落としたのがI型で、I型をホールドしていなければ、4行消しできない差分をペナルティと思ったが、大きすぎるので左空け報酬にした。
                 if curr_piece_id == 1 and hold_piece_id != 1:
@@ -1590,7 +1590,7 @@ class Block_Controller(object):
                 else:
                     reward = 0  # 削除できていないのと同じ。この行はなくても結果は変わらない。
 
-            # Retry22 Iミノホールドペナルティ　
+            # Retry23 Iミノホールドペナルティ　
             # 左端を除いた高さが4行以下で、落としたのがIミノで、Iミノをホールドしていなければ、左空け報酬をペナルティにする。
             if nx_min_height_l < 4:
                 if hold_piece_id == 1:  # Retry20 4段消しできないときにIミノホールドしていたら報酬。
