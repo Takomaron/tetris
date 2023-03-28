@@ -39,6 +39,8 @@ class Block_Controller(object):
     ShapeNone_index = 0
     CurrentShape_class = 0
     NextShape_class = 0
+    # Lvl3-01
+    delete_first = 0
 
     # 第2weight
     # 有効かどうか
@@ -1562,12 +1564,19 @@ class Block_Controller(object):
             削除報酬が+になる高さ以上で、1行消しとかをすれば、報酬が上がる。
                 -> 4段以下が左端空け状態でなければ、報酬を与えない。
         """
-        NG_RATIO = 10
-        if max_height > self.max_height_relax: # やばい高さよりたかい
+        # Lvl3-01
+
+        NG_RATIO = 1
+        if max_height > self.max_height_relax or self.delete_first: # やばい高さより高いか、削除優先状態
         #   ■ここに、ペナルティが一定値以上の場合も加えたほうがいいかもしれない。
         #   すなわち、一定以下の高さやペナルティの値にするまで、高さを下げることを優先する。
         # 　■それは、別のロジックにしたほうがいいのかもしれない。うまくいかなかったらそうしよう。
             reward /= NG_RATIO    # ネガティブブランチになるかもしれないが報酬を与える・・・LV3に必要な報酬
+            # Lvl3-01   やばい高さを超えたら、下げモード
+            # 下げモード中に所定高さより下がったら、下げモード解除
+            self.delete_first = 1
+            if max_height <= self.predict_weight2_enable_index:
+                self.delete_first = 0
         else:
             # ミス。下記は、Iミノを落とすと、0になってしまう。これが、落とさない理由。Retry22で修正したが、影響ないはずなのでそのままにしておく。
             if tetris_reward >= 4 or lines_cleared == 4:  # クリア前盤面が下から4行以上左端が空いている。か、Iミノを落として4段消しできる。
@@ -1720,8 +1729,12 @@ class Block_Controller(object):
         # Retry18 左空け報酬が1行消しより大きいと消さなくなるので、1行消しのmin報酬でクリッピングする
         reward += min(nx_tetris_reward * self.tetris_fill_reward, self.reward_list[1])
         """
+        """ Lvl3-01
         # Retry19 クリッピングを変える。やばい高さの時は1行。それ以外はクリッピングなし。
         if max_height > self.max_height_relax:
+        """
+        # Lvl3-01 クリッピングを変える。やばい高さの時や、下げモード時は1行。それ以外はクリッピングなし。
+        if max_height > self.max_height_relax or self.delete_first:
             reward += min(nx_tetris_reward * self.tetris_fill_reward, self.reward_list[1])
         else:
             reward += nx_tetris_reward * self.tetris_fill_reward
