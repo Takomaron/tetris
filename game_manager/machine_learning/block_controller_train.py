@@ -1017,7 +1017,10 @@ class Block_Controller(object):
                 if self.get_line_right_fill(reshape_board, sum_, i):    # 左端以外は埋まっている
                     reward += fill_up_reward
                     if i == 1:  # パラメータ間の整合をとるため、1段目はオフセットを加える
+                        """ Retry26 間違い修正。
                         reward += self.reward_list[1]/self.reward_list[4]/self.tetris_fill_reward
+                        """ # Retry26
+                        reward += self.reward_list[3]/self.reward_list[4]/self.tetris_fill_reward
                 else:   # 左端以外が埋まっていない
                     fill_up_reward = 0  # 左端だけが開いている状態でなければそこで報酬ストップ
                                         # 0.5にしようかと思ったが、
@@ -1565,7 +1568,7 @@ class Block_Controller(object):
                 -> 4段以下が左端空け状態でなければ、報酬を与えない。
         """
         # Lvl3-01
-
+        # 
         NG_RATIO = 1
         if max_height > self.max_height_relax or self.delete_first: # やばい高さより高いか、削除優先状態
         #   ■ここに、ペナルティが一定値以上の場合も加えたほうがいいかもしれない。
