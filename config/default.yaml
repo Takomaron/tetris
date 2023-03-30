@@ -7,12 +7,12 @@ common:
   time_disp: False
   #### 推論用Weight
   # File 指定
-  predict_weight: weight/DQN/best_weight.pt
+  predict_weight: weight/DQN/best_weight_h3.pt
 
   #### 第2model 有効
-  weight2_available: False #False
+  weight2_available: True #False
   #### 第2model
-  predict_weight2: weight/DQN/best_weight_Retry01.pt
+  predict_weight2: weight/DQN/best_weight_25.B.pt
 
   #### model 切り替えポイント (最も高い穴の位置が下記より低いとき)
   predict_weight2_enable_index: 5 # 5
