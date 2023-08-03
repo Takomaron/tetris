@@ -626,24 +626,30 @@ class Block_Controller(object):
 
     ####################################
     #次の状態リストを取得(2次元用) DQN .... 画面ボードで テトリミノ回転状態 に落下させたときの次の状態一覧を作成
+    ## 呼び出しもとで、hold_flagを切り替えて、hold入れ替え有無付きで状態一覧を作成する。
     #  get_next_func でよびだされる
     # curr_backboard 現画面
     # piece_id テトリミノ I L J T O S Z
     # currentshape_class = status["field_info"]["backboard"]
+    ## hold_flag    ホールドするかどうか
     #################################### 
-    def get_next_states_v2(self,curr_backboard,piece_id,CurrentShape_class):
+    def get_next_states_v2(self,curr_backboard,piece_id,CurrentShape_class, use_hold_function):
         states = {}
         # テトリミノごとに回転数をふりわけ
         if piece_id == 5:  # O piece
             num_rotations = 1
-        elif piece_id == 1 or piece_id == 6 or piece_id == 7:
+        elif piece_id == 1 or piece_id == 6 or piece_id == 7:   # I, S, Z piece
             num_rotations = 2
         else:
             num_rotations = 4
 
+        #(中止★ 以下の一覧は、hold_pieceと入れ替えない場合。したがって、hold_pieceと入れ替えた場合の一覧を作ればよい。)
+        #(中止★ 最初はどうするか？hold_piece=None。Noneの場合、curr_pieceで作るのか、nullを作るのか？■どう使うかによるか。)
+        #★ -> 冨家さん方式で良さそうなので、今回もそれで行く。
         # テトリミノ回転方向ごとに一覧追加
         for direction0 in range(num_rotations):
-            x0Min, x0Max = self.getSearchXRange(CurrentShape_class, direction0)
+            x0Min, x0Max = self.getSearchXRange(CurrentShape_class, direction0)#■ここで、x0Maxが10になる場合がある？
+###            print("Shape_class, direction0, x0Min, x0Max:"+str(CurrentShape_class)+", "+str(direction0)+", "+str(x0Min)+", "+str(x0Max))
             for x0 in range(x0Min, x0Max):
                 # get board data, as if dropdown block
                 # 画面ボードデータをコピーして指定座標にテトリミノを配置し落下させた画面ボードとy座標を返す
@@ -652,14 +658,15 @@ class Block_Controller(object):
                 reshape_backboard = self.get_reshape_backboard(board)
                 # numpy to tensor (配列を1次元追加)
                 reshape_backboard = torch.from_numpy(reshape_backboard[np.newaxis,:,:]).float()
-                states[(x0, direction0)] = reshape_backboard
+                states[(x0, direction0, use_hold_function)] = reshape_backboard
+                ## ↑のstates[]をholdを考慮した3次元に変更
         return states
 
     ####################################
     #次の状態を取得(1次元用) MLP  .... 画面ボードで テトリミノ回転状態 に落下させたときの次の状態一覧を作成
     #  get_next_func でよびだされる
     ####################################
-    def get_next_states(self,curr_backboard,piece_id,CurrentShape_class):
+    def get_next_states(self,curr_backboard,piece_id,CurrentShape_class, use_hold_function):
         states = {}
         # テトリミノごとに回転数をふりわけ
         if piece_id == 5:  # O piece
@@ -678,7 +685,7 @@ class Block_Controller(object):
                 board = self.getBoard(curr_backboard, CurrentShape_class, direction0, x0)
                 # ボードを２次元化
                 board = self.get_reshape_backboard(board)
-                states[(x0, direction0)] = self.get_state_properties(board)
+                states[(x0, direction0, use_hold_function)] = self.get_state_properties(board)
         return states
 
     ####################################
@@ -697,7 +704,7 @@ class Block_Controller(object):
     #reward_func から呼び出される
     #################################### 
     def step_v2(self, curr_backboard,action,curr_shape_class):
-        x0, direction0 = action
+        x0, direction0, use_hold_function = action  ### 念のため、actionに含まれているはずの、use_hold_functionも取り出しておく。
         # 画面ボードデータをコピーして指定座標にテトリミノを配置し落下させた画面ボードを返す
         board = self.getBoard(curr_backboard, curr_shape_class, direction0, x0)
         #ボードを２次元化
@@ -782,12 +789,15 @@ class Block_Controller(object):
 
         curr_shape_class = GameStatus["block_info"]["currentShape"]["class"]
         next_shape_class= GameStatus["block_info"]["nextShape"]["class"]
+        ## あれ？next_next_shape_classがなくなっている。
+        hold_shape_class = GameStatus["block_info"]["holdShape"]["class"]## 最初はNoneである。
 
         ##################
         # next shape info
         self.ShapeNone_index = GameStatus["debug_info"]["shape_info"]["shapeNone"]["index"]
         curr_piece_id =GameStatus["block_info"]["currentShape"]["index"]
         next_piece_id =GameStatus["block_info"]["nextShape"]["index"]
+        hold_piece_id =GameStatus["block_info"]["holdShape"]["index"]
         reshape_backboard = self.get_reshape_backboard(curr_backboard)
                
         ###################
@@ -796,7 +806,25 @@ class Block_Controller(object):
         #    Key = Tuple (テトリミノ画面ボードX座標, テトリミノ回転状態)
         #                 テトリミノ Move Down 降下 数, テトリミノ追加移動X座標, テトリミノ追加回転)
         #    Value = 画面ボード状態
-        next_steps =self.get_next_func(curr_backboard,curr_piece_id,curr_shape_class)
+###        print("next_steps_hold_n")
+        next_steps_hold_n =self.get_next_func(curr_backboard,curr_piece_id,curr_shape_class, "n")
+###        next_steps =self.get_next_func(curr_backboard,curr_piece_id,curr_shape_class, "n")
+
+        ## hold処理
+        if hold_piece_id == None: ##　holdしているものがない時
+            ##初回はholdだけして終了させる
+            nextMove["strategy"]["use_hold_function"] = "y"
+            ## hold_steps = self.get_next_func(curr_backboard,next_piece_id,next_shape_class)
+            ## 真面目に初回holdした場合のnext_stepsを求めると上記文になる。
+            ## 下記以降の学習時の繰り返し処理時にif文処理したくないので、初回用のダミーデータを設定しておく
+            ## hold_steps = next_steps
+            ## ↑のつもりでコードを書いたが、下記のようにreturnすることにしたのでそのコードも不要になった。
+            return nextMove
+        else:
+###            next_steps = self.get_next_func(curr_backboard,hold_piece_id,hold_shape_class, "y")
+###            print("next_steps_hold_y")
+            next_steps_hold_y = self.get_next_func(curr_backboard,hold_piece_id,hold_shape_class, "y")
+        next_steps = {**next_steps_hold_n, **next_steps_hold_y}
 
         ###############################################
         # 学習の場合
@@ -827,10 +855,22 @@ class Block_Controller(object):
             # 学習モードに変更
             self.model.train()
             # テンソルの勾配の計算を不可とする(Tensor.backward() を呼び出さないことが確実な場合)
+            ## ChatGPTによれば、勾配計算をしないのは推論時ということになっている。学習するのにこれでいいのか？・・・ここは学習していないということだな。
+            ## 疑問。このQ値は何？学習結果に基づいて一番良さそうな盤面ということかな？
             with torch.no_grad():
                 # 順伝搬し Q 値を取得 (model の __call__ ≒ forward)
                 predictions = self.model(next_states)[:, 0]
-            
+###                hold_predictions = self.model(hold_states)[:, 0]
+
+            """
+            if torch.max(predictions) < torch.max(hold_predictions):
+                nextMove["stragegy"]["use_hold_function"]="y"
+                next_steps = hold_steps
+                next_actions = hold_actions
+                next_states = hold_states
+                predictions = hold_predictions
+            """
+
             # 乱数が epsilon より小さい場合はランダムな行動
             if random_action:
                 # index を乱数とする
@@ -847,25 +887,48 @@ class Block_Controller(object):
             # action の list
             # 0: 2番目 X軸移動
             # 1: 1番目 テトリミノ回転
+            ## 2: 0番目 use_hold_function。～番目というのは、game_managerの操作準かな？
+            ## ここ以下は、多分残骸。train_sample3で使用していると推測。
             # 2: 3番目 Y軸降下 (-1: で Drop)
             # 3: 4番目 テトリミノ回転 (Next Turn)
             # 4: 5番目 X軸移動 (Next Turn)
             action = next_actions[index]
-            
+###            print("***index:"+str(index)+", action[0]=" + str(action[0]) + ", [1]=" + str(action[1]) + ", [2]=" + str(action[2]))
+
             # step, step_v2 により報酬計算
+
+            if action[2] == "y": ## hold_flagのはず
+                nextMove["strategy"]["use_hold_function"] = action[2]
+                curr_shape_class, hold_shape_class = hold_shape_class, curr_shape_class
+                curr_piece_id, hold_piece_id = hold_piece_id, curr_piece_id
+                ## Double DQN用に、holdありの場合は、入れ替えを行い、ここ以降の処理が整合するようにする。
+
             reward = self.reward_func(curr_backboard,action,curr_shape_class)
-            
+
             done = False #game over flag
             
             ################################
             # Double DQN 有効時
             #======predict max_a Q(s_(t+1),a)======
+            ## ■ここでも、hold時のQ値を反映したものにしておかなければならないが、上の細工によりcurr_backboard以外に反映済み。
             if self.double_dqn:
                 # 画面ボードデータをコピーして 指定座標にテトリミノを配置し落下させた画面ボードとy座標を返す
                 next_backboard  = self.getBoard(curr_backboard, curr_shape_class, action[1], action[0])
-                
+                ### 初回ホールド時はここを通らなくしたので、下記の心配も不要になった。
+                ##　↑■これ、初回時は盤面変わらないから、next_backboard = curr_backboardになる。
+                ##　その場合、上で記載したnext_piece_idを落とすという処理はしてはいけない動作のはず。■どうする？
+
                 #画面ボードで テトリミノ回転状態 に落下させたときの次の状態一覧を作成
-                next2_steps =self.get_next_func(next_backboard,next_piece_id,next_shape_class)
+                next2_steps_hold_n =self.get_next_func(next_backboard,next_piece_id,next_shape_class, "n")
+###                next2_steps =self.get_next_func(next_backboard,next_piece_id,next_shape_class, "n")
+                ## 上記の次の状態一覧は、holdした場合も考慮する必要がある。つまり、DQNの時の改造と同じ改造が必要
+                ## 上記に従い、下記を改造した。
+                next2_steps_hold_y = self.get_next_func(next_backboard,hold_piece_id,hold_shape_class, "y")
+                next2_steps = {**next2_steps_hold_n, **next2_steps_hold_y}
+
+                ### 初回ホールド時はここを通らなくしたので、下記の心配も不要になった。
+                ## ↑■　初回hold直後、同じ状態を算出することになるので、next_next_piece_idでなければならない。
+                ## また、next_piece_idではなく、hold_piece_idと交換されるかもしれないので、その場合のstepsを算出しなければならない。
                 # 次の状態一覧の action と states で配列化
                 next2_actions, next2_states = zip(*next2_steps.items())
                 # next_states のテンソルを連結
@@ -874,6 +937,7 @@ class Block_Controller(object):
                 # 学習モードに変更
                 self.model.train()
                 # テンソルの勾配の計算を不可とする
+                ## ■疑問。下記の計算は学習ではないのだろうか？学習なら、勾配の計算は必要ではないのだろうか
                 with torch.no_grad():
                     # 順伝搬し Q 値を取得 (model の __call__ ≒ forward)
                     next_predictions = self.model(next2_states)[:, 0]
@@ -956,6 +1020,9 @@ class Block_Controller(object):
             nextMove["strategy"]["y_operation"] = 1
             # Move Down 降下数
             nextMove["strategy"]["y_moveblocknum"] = 1
+            # hold機能
+            nextMove["strategy"]["use_hold_function"] = action[2]
+
             
             # 規定値よりブロック数が多ければ、強制的にリセットする
             if self.tetrominoes > self.max_tetrominoes:
@@ -970,6 +1037,9 @@ class Block_Controller(object):
             #推論モードに切り替え
             self.model.eval()
             ### 画面ボードの次の状態一覧を action と states にわけ、states を連結
+            #★このあたりにもholdのデータを持ってくる。★・・・あれ？不要じゃない？
+            ## 学習結果が使われているのだから、holdするかしないかもAIが判断？あるいは、初回だけはholdして帰るようにしたほうが良いのかも。
+            ## ここでやはり、ホールドするかどうするかが問題になるので、冨家さん方式はやめる。
             next_actions, next_states = zip(*next_steps.items())
             next_states = torch.stack(next_states)
             ## 順伝搬し Q 値を取得 (model の __call__ ≒ forward)
@@ -989,6 +1059,8 @@ class Block_Controller(object):
             nextMove["strategy"]["y_operation"] = 1
             # Move Down 降下数
             nextMove["strategy"]["y_moveblocknum"] = 1
+            # hold機能
+            nextMove["strategy"]["use_hold_function"] = action[2]
         return nextMove
 
     ####################################
@@ -1056,6 +1128,7 @@ class Block_Controller(object):
         coordArray = self.getShapeCoordArray(Shape_class, direction, x, 0)
         # update dy
         # テトリミノ座標配列ごとに...
+###        print("Shape_class, direction, x:"+str(Shape_class)+", "+str(direction)+", "+str(x))
         for _x, _y in coordArray:
             _yy = 0
             # _yy を一つずつ落とすことによりブロックの落下下限を確認
