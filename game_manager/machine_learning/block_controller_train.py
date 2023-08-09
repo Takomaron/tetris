@@ -941,8 +941,9 @@ class Block_Controller(object):
     # curr_backboard 現画面
     # piece_id テトリミノ I L J T O S Z
     # currentshape_class = status["field_info"]["backboard"]
+    ### use_hold_function    ホールドするかどうか
     ####################################
-    def get_next_states_v2(self, curr_backboard, piece_id, CurrentShape_class):
+    def get_next_states_v2(self, curr_backboard, piece_id, CurrentShape_class, use_hold_function):
         # 次の状態一覧
         states = {}
 
@@ -990,7 +991,9 @@ class Block_Controller(object):
                 #                 ... -1 の場合 動作対象外
                 #    Value = 画面ボード状態
                 # (action 用)
-                states[(x0, direction0, -1, -1, -1)] = reshape_backboard
+###                states[(x0, direction0, -1, -1, -1)] = reshape_backboard
+                states[(x0, direction0, -1, -1, -1, use_hold_function)] = reshape_backboard
+                ### ↑のstates[]をholdを考慮した配列に変更
 
         #print(len(states), end='=>')
 
@@ -1181,7 +1184,7 @@ class Block_Controller(object):
     #次の状態を取得(1次元用) MLP  .... 画面ボードで テトリミノ回転状態 に落下させたときの次の状態一覧を作成
     #  get_next_func でよびだされる
     ####################################
-    def get_next_states(self, curr_backboard, piece_id, CurrentShape_class):
+    def get_next_states(self, curr_backboard, piece_id, CurrentShape_class, use_hold_function):
         # 次の状態一覧
         states = {}
 
@@ -1210,7 +1213,7 @@ class Block_Controller(object):
                 #    Key = Tuple (テトリミノ Drop Down 落下 時画面ボードX座標, テトリミノ回転状態
                 #                 テトリミノ Move Down 降下 数, テトリミノ追加移動X座標, テトリミノ追加回転)
                 #    Value = 画面ボード状態
-                states[(x0, direction0, 0, 0, 0)] = self.get_state_properties(reshape_board)
+                states[(x0, direction0, 0, 0, 0, use_hold_function)] = self.get_state_properties(reshape_board)
 
         return states
 
@@ -1320,7 +1323,7 @@ class Block_Controller(object):
     #reward_func から呼び出される
     ####################################
     def step_v2(self, curr_backboard, action, curr_shape_class):
-        x0, direction0, third_y, forth_direction, fifth_x = action
+        x0, direction0, third_y, forth_direction, fifth_x, use_hold_function = action
         ## 画面ボードデータをコピーして指定座標にテトリミノを配置し落下させた画面ボードとy座標を返す
         board, drop_y = self.getBoard(curr_backboard, curr_shape_class, direction0, x0, -1)
         ##ボードを２次元化
@@ -1438,12 +1441,14 @@ class Block_Controller(object):
 
         curr_shape_class = GameStatus["block_info"]["currentShape"]["class"]
         next_shape_class= GameStatus["block_info"]["nextShape"]["class"]
-
+        hold_shape_class = GameStatus["block_info"]["holdShape"]["class"]
+        
         ##################
         # next shape info
         self.ShapeNone_index = GameStatus["debug_info"]["shape_info"]["shapeNone"]["index"]
         curr_piece_id =GameStatus["block_info"]["currentShape"]["index"]
         next_piece_id =GameStatus["block_info"]["nextShape"]["index"]
+        hold_piece_id =GameStatus["block_info"]["holdShape"]["index"]
 
         #reshape_backboard = self.get_reshape_backboard(curr_backboard)
         #print(reshape_backboard)
@@ -1474,8 +1479,18 @@ class Block_Controller(object):
         #    Key = Tuple (テトリミノ画面ボードX座標, テトリミノ回転状態)
         #                 テトリミノ Move Down 降下 数, テトリミノ追加移動X座標, テトリミノ追加回転)
         #    Value = 画面ボード状態
-        next_steps = self.get_next_func(curr_backboard, curr_piece_id, curr_shape_class)
-        #print (len(next_steps), end='=>')
+        next_steps_hold_n = self.get_next_func(curr_backboard, curr_piece_id, curr_shape_class, "n")
+        #print (len(next_steps_hold_n), end='=>')
+
+        ## hold処理
+        if hold_piece_id == None: ##　holdしているものがない時
+            ##初回はholdだけして終了させる
+            nextMove["strategy"]["use_hold_function"] = "y"
+            return nextMove
+        else:
+            next_steps_hold_y = self.get_next_func(curr_backboard, hold_piece_id, hold_shape_class, "y")
+		## Hold無しと有りを合成
+        next_steps = {**next_steps_hold_n, **next_steps_hold_y}
 
         ###############################################
         ###############################################
@@ -1506,7 +1521,9 @@ class Block_Controller(object):
                 ######################
                 # 次の予測を上位predict_next_steps_trainつ実施, 1番目からpredict_next_num_train番目まで予測
                 index_list, index_list_to_q, next_actions, next_states \
-                            = self.get_predictions(self.model, True, GameStatus, next_steps, self.predict_next_steps_train, 1, self.predict_next_num_train, index_list, index_list_to_q, -60000)
+                            = self.get_predictions(self.model, True, GameStatus, next_steps, 
+                                                   self.predict_next_steps_train, 1, self.predict_next_num_train, 
+                                                   index_list, index_list_to_q, -60000)
                 #print(index_list_to_q)
                 #print("max")
 
@@ -1566,8 +1583,18 @@ class Block_Controller(object):
             # 2: 3番目 Y軸降下 (-1: で Drop)
             # 3: 4番目 テトリミノ回転 (Next Turn)
             # 4: 5番目 X軸移動 (Next Turn)
+            ## 5: 6番目 use_hold_function。～番目というのは、game_managerの操作準かな？
             action = next_actions[index]
+###            print("***index:"+str(index)+", action[0]=" + str(action[0]) + ", [1]=" + str(action[1]) + ", [2]=" + str(action[2] + ", [3]=" + str(action[3]) + ", [4]=" + str(action[4]) + ", [5]=" + str(action[5]))
+
             # step, step_v2 により報酬計算
+            
+            if action[5] == "y": ## index=5がhold_flagのはず
+                nextMove["strategy"]["use_hold_function"] = action[5]
+                curr_shape_class, hold_shape_class = hold_shape_class, curr_shape_class
+                curr_piece_id, hold_piece_id = hold_piece_id, curr_piece_id
+                ## Double DQN用に、holdありの場合は、入れ替えを行い、ここ以降の処理が整合するようにする。
+            
             reward = self.reward_func(curr_backboard, action, curr_shape_class)
             
             done = False #game over flag
@@ -1575,12 +1602,18 @@ class Block_Controller(object):
             #####################################
             # Double DQN 有効時
             #======predict max_a Q(s_(t+1),a)======
+
+            ## ■ここでも、hold時のQ値を反映したものにしておかなければならないが、上の細工によりcurr_backboard以外に反映済み。
+
             #if use double dqn, predicted by main model
             if self.double_dqn:
                 # 画面ボードデータをコピーして 指定座標にテトリミノを配置し落下させた画面ボードとy座標を返す
                 next_backboard, drop_y  = self.getBoard(curr_backboard, curr_shape_class, action[1], action[0], action[2])
                 #画面ボードで テトリミノ回転状態 に落下させたときの次の状態一覧を作成
-                next2_steps = self.get_next_func(next_backboard, next_piece_id, next_shape_class)
+                next2_steps_hold_n = self.get_next_func(next_backboard, next_piece_id, next_shape_class, "n")
+                next2_steps_hold_y = self.get_next_func(next_backboard, hold_piece_id, hold_shape_class, "y")
+                next2_steps = {**next2_steps_hold_n, **next2_steps_hold_y}
+                
                 # 次の状態一覧の action と states で配列化
                 next2_actions, next2_states = zip(*next2_steps.items())
                 # next_states のテンソルを連結
@@ -1592,6 +1625,7 @@ class Block_Controller(object):
                 # モデルの学習実施
                 ##########################
                 self.model.train()
+                ## ■疑問。下記の計算は学習ではないのだろうか？学習なら、勾配の計算は必要ではないのだろうか
                 # テンソルの勾配の計算を不可とする
                 with torch.no_grad():
                     # 順伝搬し Q 値を取得 (model の __call__ ≒ forward)
@@ -1608,7 +1642,10 @@ class Block_Controller(object):
                 # 画面ボードデータをコピーして 指定座標にテトリミノを配置し落下させた画面ボードとy座標を返す
                 next_backboard, drop_y  = self.getBoard(curr_backboard, curr_shape_class, action[1], action[0], action[2])
                 #画面ボードで テトリミノ回転状態 に落下させたときの次の状態一覧を作成
-                next2_steps =self.get_next_func(next_backboard, next_piece_id, next_shape_class)
+                next2_steps_hold_n = self.get_next_func(next_backboard, next_piece_id, next_shape_class, "n")
+                next2_steps_hold_y = self.get_next_func(next_backboard, hold_piece_id, hold_shape_class, "y")
+                next2_steps = {**next2_steps_hold_n, **next2_steps_hold_y}
+
                 # 次の状態一覧の action と states で配列化
                 next2_actions, next2_states = zip(*next2_steps.items())
                 # next_states のテンソルを連結
@@ -1634,7 +1671,10 @@ class Block_Controller(object):
                 # 画面ボードデータをコピーして 指定座標にテトリミノを配置し落下させた画面ボードとy座標を返す
                 next_backboard, drop_y  = self.getBoard(curr_backboard, curr_shape_class, action[1], action[0], action[2])
                 #画面ボードで テトリミノ回転状態 に落下させたときの次の状態一覧を作成
-                next2_steps =self.get_next_func(next_backboard, next_piece_id, next_shape_class)
+                next2_steps_hold_n = self.get_next_func(next_backboard, next_piece_id, next_shape_class, "n")
+                next2_steps_hold_y = self.get_next_func(next_backboard, hold_piece_id, hold_shape_class, "y")
+                next2_steps = {**next2_steps_hold_n, **next2_steps_hold_y}
+
                 # 次の状態一覧の action と states で配列化
                 next2_actions, next2_states = zip(*next2_steps.items())
                 # 次の状態を index で指定し取得
@@ -1719,6 +1759,8 @@ class Block_Controller(object):
                 # debug
                 if self.debug_flag_move_down == 1:
                     print("Move Down: ", "(", action[0], ",", action[2], ")")
+            ## hold機能
+            nextMove["strategy"]["use_hold_function"] = action[5]
 
             ##########
             # 学習終了処理
@@ -1799,6 +1841,7 @@ class Block_Controller(object):
             # 2: 3番目 Y軸降下 (-1: で Drop)
             # 3: 4番目 テトリミノ回転 (Next Turn)
             # 4: 5番目 X軸移動 (Next Turn)
+            ## 5: 6番目 use_hold_function。～番目というのは、game_managerの操作順かな？
             action = next_actions[index]
 
             ###############################################
@@ -1833,6 +1876,8 @@ class Block_Controller(object):
                 # debug
                 if self.debug_flag_move_down == 1:
                     print("Move Down: ", "(", action[0], ",", action[2], ")")
+            ## hold機能
+            nextMove["strategy"]["use_hold_function"] = action[5]
         ## 終了時刻
         if self.time_disp:
             print(datetime.now()-t1)
@@ -1845,10 +1890,10 @@ class Block_Controller(object):
     # predict_model: モデル指定
     # is_train: 学習モード状態の場合 (no_gradにするため)
     # GameStatus: GameStatus
-    # prev_steps: 前の手番の候補手リスト
+    # prev_steps: 前の手番の候補手リスト### 呼び出し元で、hold有無付きで準備できている。再起呼び出しでも同様の準備必要。
     # num_steps: 1つの手番で候補手をいくつ探すか
     # next_order: いくつ先の手番か
-    # left: 何番目の手番まで探索するか
+    # left: 何番目の手番まで探索するか  ### 呼び出し元は1固定で呼び出している。
     # index_list: 手番ごとのindexリスト
     # index_list_to_q: 手番ごとのindexリストから Q 値への変換
     ####################################
@@ -1904,15 +1949,39 @@ class Block_Controller(object):
         
                 # 次の予想手リスト
                 # next_state Numpy に変換し int にして、1次元化
-                next_steps = self.get_next_func( np.ravel(next_state.numpy().astype(int)),
+##                next_steps = self.get_next_func( np.ravel(next_state.numpy().astype(int)),
+##                                     GameStatus["block_info"]["nextShapeList"]["element"+str(next_order)]["index"],
+##                                     GameStatus["block_info"]["nextShapeList"]["element"+str(next_order)]["class"]) 
+                next_steps_hold_n = self.get_next_func( np.ravel(next_state.numpy().astype(int)),
                                      GameStatus["block_info"]["nextShapeList"]["element"+str(next_order)]["index"],
-                                     GameStatus["block_info"]["nextShapeList"]["element"+str(next_order)]["class"]) 
+                                     GameStatus["block_info"]["nextShapeList"]["element"+str(next_order)]["class"], "n") 
+##              同様に、holdありの場合の状態も生成しておく。
+                next_steps_hold_y = self.get_next_func( np.ravel(next_state.numpy().astype(int)),
+                                     GameStatus["block_info"]["holdShape"]["index"],
+                                     GameStatus["block_info"]["holdShape"]["class"], "y") 
+                next_steps = {**next_steps_hold_n, **next_steps_hold_y}
+
+##              上記の結果で、next_stepsはhold有無を含めて生成される。
+##              次の再帰呼び出しの前にGameStatusのholdShapeをhold有無に応じて更新しなければならない。
+##              すなわち、holdありなら["holdShape"]は、["nextShapeList"]["element"+str(next_order)]になる。
+##              holdなしなら、["holdShape"]は、変わらない。
+##              したがって、正確に再帰するには下記のようにしなければならない。
+##              1. next_stepsの結果で、hold有無をQ値に従って決定する。
+##              2. 決定した結果により、GameStatusを更新する。呼び出し元のGameStatus[]を変更するのはまずいので、
+##                  この関数内専用のGameStatusを用意してコピーしなければならないと思う。ん？pythonなら大丈夫かな？
+##                  いろいろ大変なので、ここからの再帰については、holdは常になしにしておく
+##                  これにより、1手までは正しいが、2手以降については、正しく推論できないと思う。
+##                  例えば、１手目でhold実行した場合、2手目のholdShapeが正しくない。
+##                  正しくは、nextShapeList, element+str(next_order)がholdShapeなのに、そうならずに最初のholdShapeのままになる。
+##              あれ？何か違う。get_predictions()の中身を確認しないと・・・。ただ、一旦動作するかどうか見よう。
+
                 #GameStatus["block_info"]["nextShapeList"]["element"+str(1)]["direction_range"]
     
                 ## 次の予測を上位 num_steps 実施, next_order 番目から left 番目まで予測
                 new_index_list, index_list_to_q, new_next_actions, new_next_states \
                                 = self.get_predictions(predict_model, is_train, GameStatus, 
-                                    next_steps, num_steps, next_order+1, left, new_index_list, index_list_to_q, highest_q)
+                                    next_steps, num_steps, next_order+1, left, new_index_list, 
+                                    index_list_to_q, highest_q)
                 # 次のカウント
                 #predict_order += 1
         # 再帰終了
@@ -2046,4 +2115,5 @@ class Block_Controller(object):
             #center_x, center_y の 画面ボードにブロックを配置して、その画面ボードデータを返す
             _board[(_y + center_y) * self.board_data_width + _x] = Shape_class.shape
         return _board
-BLOCK_CONTROLLER_TRAIN_SAMPLE3 = Block_Controller()
+###BLOCK_CONTROLLER_TRAIN_SAMPLE3 = Block_Controller()
+BLOCK_CONTROLLER_TRAIN = Block_Controller()
