@@ -408,7 +408,7 @@ class Block_Controller(object):
         self.max_score = -99999
         self.epoch_reward = 0
         self.cleared_lines = 0
-        self.cleared_col = [0,0,0,0,0]
+        self.cleared_col = [0,0,0,0,0,0] ## 全クリア追加
         self.iter = 0 
         # 初期ステート
         self.state = self.initial_state 
@@ -427,8 +427,10 @@ class Block_Controller(object):
         self.score_list = cfg["tetris"]["score_list"]
         # 報酬読み込み
         self.reward_list = cfg["train"]["reward_list"]
+        ## 全消去報酬
+        self.all_clear = self.reward_list[5]    ##  10000
         # Game Over 報酬 = Penalty
-        self.penalty =  self.reward_list[5]
+        self.penalty =  self.reward_list[6]     ##  -10000
 
         ########
         # 報酬を 1 で正規化、ただし消去報酬のみ...Q値の急激な変動抑制
@@ -517,9 +519,9 @@ class Block_Controller(object):
             # リプレイメモリが1/10たまっていないなら、
             if len(self.replay_memory) < self.replay_memory_size / 10:
                 print("================pass================")
-                print("iter: {} ,meory: {}/{} , score: {}, clear line: {}, block: {}, col1-4: {}/{}/{}/{} ".format(self.iter,
+                print("iter: {} ,meory: {}/{} , score: {}, clear line: {}, block: {}, col1-4: {}/{}/{}/{}/{} ".format(self.iter,
                 len(self.replay_memory),self.replay_memory_size / 10,self.score,self.cleared_lines
-                ,self.tetrominoes, self.cleared_col[1], self.cleared_col[2], self.cleared_col[3], self.cleared_col[4]))
+                ,self.tetrominoes, self.cleared_col[1], self.cleared_col[2], self.cleared_col[3], self.cleared_col[4], self.cleared_col[5]))
             # リプレイメモリがいっぱいなら
             else:
                 print("================update================")
@@ -626,7 +628,7 @@ class Block_Controller(object):
 
                 ###################################
                 # 結果の出力
-                log = "Epoch: {} / {}, Score: {},  block: {},  Reward: {:.4f} Cleared lines: {}, col: {}/{}/{}/{} ".format(
+                log = "Epoch: {} / {}, Score: {},  block: {},  Reward: {:.4f} Cleared lines: {}, col: {}/{}/{}/{}/{} ".format(
                     self.epoch,
                     self.num_epochs,
                     self.score,
@@ -636,7 +638,8 @@ class Block_Controller(object):
                     self.cleared_col[1],
                     self.cleared_col[2],
                     self.cleared_col[3],
-                    self.cleared_col[4]
+                    self.cleared_col[4],
+                    self.cleared_col[5] ## all clear
                     )
                 print(log)
                 with open(self.log,"a") as f:
@@ -657,6 +660,7 @@ class Block_Controller(object):
                 self.writer.add_scalar('Train/2 line', self.cleared_col[2], self.epoch - 1) 
                 self.writer.add_scalar('Train/3 line', self.cleared_col[3], self.epoch - 1) 
                 self.writer.add_scalar('Train/4 line', self.cleared_col[4], self.epoch - 1) 
+                self.writer.add_scalar('Train/AllClr', self.cleared_col[5], self.epoch - 1) 
 
             ###################################
             # EPOCH 数が規定数を超えたら
@@ -682,7 +686,7 @@ class Block_Controller(object):
         # 推論の場合
         else:
             self.epoch += 1
-            log = "Epoch: {} / {}, Score: {},  block: {}, Reward: {:.4f} Cleared lines: {}- {}/ {}/ {}/ {}".format(
+            log = "Epoch: {} / {}, Score: {},  block: {}, Reward: {:.4f} Cleared lines: {}- {}/ {}/ {}/ {}/ {}".format(
             self.epoch,
             self.num_epochs,
             self.score,
@@ -692,7 +696,8 @@ class Block_Controller(object):
             self.cleared_col[1],
             self.cleared_col[2],
             self.cleared_col[3],
-            self.cleared_col[4]
+            self.cleared_col[4],
+            self.cleared_col[5]
             )
 
         ###################################
@@ -715,7 +720,7 @@ class Block_Controller(object):
         self.state = self.initial_state
         self.score = 0
         self.cleared_lines = 0
-        self.cleared_col = [0,0,0,0,0]
+        self.cleared_col = [0,0,0,0,0,0]
         self.epoch_reward = 0
         # テトリミノ 0 個
         self.tetrominoes = 0
@@ -759,6 +764,7 @@ class Block_Controller(object):
         max_height = np.max(heights)
         # 最も低いところをとる (返り値用)
         min_height = np.min(heights)
+        min_height_l = np.min(heights[1:])    #★ 左端以外で最小高さ
 
         # 右端列を削った 高さ配列
         #currs = heights[:-1]
@@ -776,6 +782,8 @@ class Block_Controller(object):
 
         # 差分の絶対値を合計してでこぼこ度とする
         total_bumpiness = np.sum(diffs)
+        # Retry17 上記の計算だけだと階段状の場合に凸凹度が低くなるので、さらに高低差を加える。
+        total_bumpiness += (max_height - min_height_l)
 
         # 3以上の段差の数を数える
         over3_diff_count = np.count_nonzero(diffs > 2)
@@ -796,6 +804,8 @@ class Block_Controller(object):
         highest_grounds = [-1] * self.width
         # 最も高い穴の list
         highest_holes = [-1] * self.width
+        lowest_holes = [-1] * self.width
+
         # 列ごとに切り出し
         for i in range(self.width):
             # 列取得
@@ -823,14 +833,32 @@ class Block_Controller(object):
             # 最も高い穴の位置配列
             if len(cols_holes) > 0:
                 highest_holes[i] = cols_holes[0]
+                lowest_holes[i] = cols_holes[-1]    #★ 最も低い穴の位置配列
             else:
                 highest_holes[i] = -1
+                lowest_holes[i] = self.height   #★
 
         ## 最も高い穴を求める
         max_highest_hole = max(highest_holes)
 
+        # 一番低い穴の高さ
+        lowest_hole_height = min(lowest_holes)
+
+        ## hole_top_penaltyを穴の上のブロック数の総和に変更
+        # 列ごとに切り出し
+        for i in range(self.width):
+            # 穴の底位置がhole_top_limit_heightより高く
+            # 穴の上の地面がhole_top_limitより高いなら Penalty
+            if lowest_holes[i] != self.height and \
+               lowest_holes[i] > self.hole_top_limit_height and \
+               highest_grounds[i] >= lowest_holes[i] + self.hole_top_limit:
+                hole_top_penalty += highest_grounds[i] - lowest_holes[i]
+            # これは、穴の上の積み上げ数ではなく、穴の上の積み上げ高さになる。穴が多くても、ペナルティは一緒。天井が消されれば、ペナルティが一気に減るからいい方向
+
+        """
         ## 到達可能の最下層より1行下の穴の位置をチェック
-        if min_height > 0:
+##        if min_height > 0:
+        if min_height >= 0: ## 計算しない場合に-1がセットされているので、おそらく条件文はバグ
             ## 最も高いところにある穴の数
             highest_hole_num = 0
             ## 列ごとに切り出し
@@ -850,7 +878,7 @@ class Block_Controller(object):
             #print(['{:02}'.format(n) for n in highest_holes])
             #print(hole_top_penalty, hole_top_penalty*max_highest_hole)
             #print("==")
-
+        """
         return num_holes, hole_top_penalty, max_highest_hole
     
     ####################################
@@ -1368,6 +1396,9 @@ class Block_Controller(object):
         reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0,max_height))/self.height_line_reward)
         ## 継続報酬
         #reward += 0.01
+        #★　全クリア報酬
+        if max_height == 0:
+            reward += self.all_clear
         #### 形状の罰報酬
         ## でこぼこ度罰
         reward -= self.reward_weight[0] * bampiness 
@@ -1380,9 +1411,11 @@ class Block_Controller(object):
         reward -= self.hole_top_limit_reward * hole_top_penalty * max_highest_hole
         ## 左端以外埋めている状態報酬
         reward += tetris_reward * self.tetris_fill_reward
+        """左端が埋まっている場合に、左開け報酬を0にしているので、このペナルティは無しにしてみる。
         ## 左端が高すぎる場合の罰
         if left_side_height > self.bumpiness_left_side_relax:
             reward -= (left_side_height - self.bumpiness_left_side_relax) * self.left_side_height_penalty
+        """
         # 3以上の段差を作った場合の罰
         reward -= over3_diff_count * self.over3_diff_penalty
         #print(over3_diff_count * self.over3_diff_penalty)
