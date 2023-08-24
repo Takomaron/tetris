@@ -1399,6 +1399,7 @@ class Block_Controller(object):
         #★　全クリア報酬
         if max_height == 0:
             reward += self.all_clear
+            self.cleared_col[5] += 1    ## 全クリア回数をここで加算しておく。
         #### 形状の罰報酬
         ## でこぼこ度罰
         reward -= self.reward_weight[0] * bampiness 
