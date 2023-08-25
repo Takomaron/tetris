@@ -951,17 +951,19 @@ class Block_Controller(object):
         """
         # Retry25
         fill_up_reward = 1  #　rewardの加算を 定数1 の代わりに変数としている
+        reward = self.reward_list[3] / self.tetris_fill_reward  #★　左空け報酬を３行消し報酬より上にする。行数の影響を受ける。
         # 高さがtetris fill height未満の間だけ報酬を加算する。
         for i in range(1, self.tetris_fill_height):
             # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
             if reshape_board[self.height - i][0] == 0:  # 左端が空いている
                 if self.get_line_right_fill(reshape_board, sum_, i):    # 左端以外は埋まっている
                     reward += fill_up_reward
-                    """ 下記の整合は、パラメータ調整しているので、一旦コメントアウト 
+                    """
+                    ## Try04 Try03で左空けしなかったので報酬を増やすために3行けし以上の報酬を与える。
                     if i == 1:  # パラメータ間の整合をとるため、1段目はオフセットを加える
                         reward += self.reward_list[3]/self.reward_list[4]/self.tetris_fill_reward
                     """
-                else:   # 左端以外が埋まっていない
+                else:   # 左空けが連続している間だけ報酬を与える
                     fill_up_reward = 0  # 左端だけが開いている状態でなければ、これ以降報酬は増えない。
                                         # 0.5にしようかと思ったが・・・
                 """ 下記の調整は、パラメータ調整で不要になったと思われるので削除
@@ -969,7 +971,7 @@ class Block_Controller(object):
             elif sum_[self.height - i] == self.width:
                 reward += fill_up_reward
                 """
-            else:   # ここは、左端が埋まっていて、かつ、削除業でもない場合。左端を開けている意味がないので報酬０
+            else:   # ここは、左端が埋まっていて、かつ、削除行でもない場合。左端を開けている意味がないので報酬０
                     # 報酬半減がいいかとも思ったが、とりあえず、Retry25では0
                 reward = 0
                 break   # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬０
@@ -1411,7 +1413,9 @@ class Block_Controller(object):
         ## 穴の上のブロック数罰
         reward -= self.hole_top_limit_reward * hole_top_penalty * max_highest_hole
         ## 左端以外埋めている状態報酬
-        reward += tetris_reward * self.tetris_fill_reward
+        ## やばい高さ以上で左空け報酬をなくすTry04
+        if max_height < self.max_height_relax:
+            reward += tetris_reward * self.tetris_fill_reward
         """左端が埋まっている場合に、左開け報酬を0にしているので、このペナルティは無しにしてみる。
         ## 左端が高すぎる場合の罰
         if left_side_height > self.bumpiness_left_side_relax:
