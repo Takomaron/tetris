@@ -1043,7 +1043,7 @@ class Block_Controller(object):
                 # 画面ボードx0で テトリミノ回転状態 direction0 に落下させたときの次の状態を作成 追加
                 #  states
                 #    Key = Tuple (テトリミノ Drop Down 落下 時画面ボードX座標, テトリミノ回転状態
-                #                 テトリミノ Move Down 降下 数, テトリミノ追加移動X座標, テトリミノ追加回転)
+                #                 テトリミノ Move Down 降下 数, テトリミノ追加移動X座標, テトリミノ追加回転, ### hold有無)
                 #                 ... -1 の場合 動作対象外
                 #    Value = 画面ボード状態
                 # (action 用)
@@ -1584,10 +1584,16 @@ class Block_Controller(object):
                 index_list_to_q = {}
                 ######################
                 # 次の予測を上位predict_next_steps_trainつ実施, 1番目からpredict_next_num_train番目まで予測
+                """ Try08 再起呼び出し可能なように現在の盤面でのホールドピースを渡す
                 index_list, index_list_to_q, next_actions, next_states \
                             = self.get_predictions(self.model, True, GameStatus, next_steps, 
                                                    self.predict_next_steps_train, 1, self.predict_next_num_train, 
                                                    index_list, index_list_to_q, -60000)
+                """
+                index_list, index_list_to_q, next_actions, next_states \
+                            = self.get_predictions(self.model, True, GameStatus, next_steps, 
+                                                   self.predict_next_steps_train, 1, self.predict_next_num_train, 
+                                                   index_list, index_list_to_q, -60000, curr_piece_id, curr_shape_class, hold_piece_id, hold_shape_class)
                 #print(index_list_to_q)
                 #print("max")
 
@@ -1638,7 +1644,8 @@ class Block_Controller(object):
                     index = torch.argmax(predictions).item()
 
             # 次の action states を上記の index 元に決定
-            next_state = next_states[index, :]
+###            next_state = next_states[index, :]
+            next_state = next_states[index] # 私にはこちらの書き方の方がわかりやすい
 
             # index にて次の action の決定 
             # action の list
@@ -1849,7 +1856,7 @@ class Block_Controller(object):
                 ## 最も高い穴の位置を求める
                 _ , _ , max_highest_hole = self.get_holes(reshape_board, -1)
                 ## model2 切り替え条件
-                if max_highest_hole < self.predict_weight2_enable_index:
+                if max_highest_hole < self.predict_weight2_enable_index:    ##ヒステリシスを設けている？
                     self.weight2_enable = True
                 ## model1 切り替え条件
                 if max_highest_hole > self.predict_weight2_disable_index:
@@ -1876,9 +1883,14 @@ class Block_Controller(object):
                 index_list_to_q = {}
                 ######################
                 # 次の予測を上位predict_next_stepsつ実施, 1番目からpredict_next_num番目まで予測
+                """Try08 Predictionsへのhold組み込み
                 index_list, index_list_to_q, next_actions, next_states \
                             = self.get_predictions(predict_model, False, GameStatus, next_steps, self.predict_next_steps, 
                                 1, self.predict_next_num, index_list, index_list_to_q, -60000)
+                """
+                index_list, index_list_to_q, next_actions, next_states \
+                            = self.get_predictions(predict_model, False, GameStatus, next_steps, self.predict_next_steps, 
+                                1, self.predict_next_num, index_list, index_list_to_q, -60000, curr_piece_id, curr_shape_class, hold_piece_id, hold_shape_class)
                 #print(index_list_to_q)
                 #print("max")
 
@@ -1956,12 +1968,16 @@ class Block_Controller(object):
     # GameStatus: GameStatus
     # prev_steps: 前の手番の候補手リスト### 呼び出し元で、hold有無付きで準備できている。再起呼び出しでも同様の準備必要。
     # num_steps: 1つの手番で候補手をいくつ探すか
-    # next_order: いくつ先の手番か
-    # left: 何番目の手番まで探索するか  ### 呼び出し元は1固定で呼び出している。
+    # next_order: いくつ先の手番か　### 呼び出し元は1
+    # left: 何番目の手番まで探索するか  ### default.yamlで設定されいている。
     # index_list: 手番ごとのindexリスト
     # index_list_to_q: 手番ごとのindexリストから Q 値への変換
+    ### hold_y_piece_id テトリミノ I L J T O S Z・・・前の手番でhold_yだった時のホールドミノのID・・・get_next_funcに渡すため
+    ### hold_y_shape_class = status["field_info"]["backboard"]・・・前の手番でhold_yだった時のホールドミノのクラス・・・get_next_funcに渡すため
+    ### hold_n_piece_id テトリミノ I L J T O S Z・・・前の手番でhold_nだった時のホールドミノのID・・・get_next_funcに渡すため
+    ### hold_n_shape_class = status["field_info"]["backboard"]・・・前の手番でhold_nだった時のホールドミノのクラス・・・get_next_funcに渡すため
     ####################################
-    def get_predictions(self, predict_model, is_train, GameStatus, prev_steps, num_steps, next_order, left, index_list, index_list_to_q, highest_q):
+    def get_predictions(self, predict_model, is_train, GameStatus, prev_steps, num_steps, next_order, left, index_list, index_list_to_q, highest_q, hold_y_piece_id, hold_y_shape_class, hold_n_piece_id, hold_n_shape_class):
         ## 次の予測一覧
         next_predictions = []
         ## index_list 複製
@@ -2010,7 +2026,15 @@ class Block_Controller(object):
                 # Numpy に変換し int にして、1次元化
                 #next_predict_backboard.append(np.ravel(next_state.numpy().astype(int)))
                 #print(predict_order,":", next_predict_backboard[predict_order])
-        
+
+                ## try08 ホールドミノには引数で渡されたものを使う
+                if next_actions[index][5] == "y":
+                    hold_piece_id = hold_y_piece_id
+                    hold_shape_class = hold_y_shape_class
+                else:
+                    hold_piece_id = hold_n_piece_id
+                    hold_shape_class = hold_n_shape_class
+
                 # 次の予想手リスト
                 # next_state Numpy に変換し int にして、1次元化
 ##                next_steps = self.get_next_func( np.ravel(next_state.numpy().astype(int)),
@@ -2019,33 +2043,33 @@ class Block_Controller(object):
                 next_steps_hold_n = self.get_next_func( np.ravel(next_state.numpy().astype(int)),
                                      GameStatus["block_info"]["nextShapeList"]["element"+str(next_order)]["index"],
                                      GameStatus["block_info"]["nextShapeList"]["element"+str(next_order)]["class"], "n") 
+
 ##              同様に、holdありの場合の状態も生成しておく。
+###2023/09/18   以下で、next_order番目のholdをとってこなければならない。GameStatusから持ってきてはいけない。■
+                """ try08 ホールドミノには引数で渡されたものを使う・・・■action[5]により入れ替えは不要か？
                 next_steps_hold_y = self.get_next_func( np.ravel(next_state.numpy().astype(int)),
                                      GameStatus["block_info"]["holdShape"]["index"],
                                      GameStatus["block_info"]["holdShape"]["class"], "y") 
+                """
+                next_steps_hold_y = self.get_next_func( np.ravel(next_state.numpy().astype(int)),
+                                     hold_piece_id,
+                                     hold_shape_class, "y") 
+
                 next_steps = {**next_steps_hold_n, **next_steps_hold_y}
 
-##              上記の結果で、next_stepsはhold有無を含めて生成される。
-##              次の再帰呼び出しの前にGameStatusのholdShapeをhold有無に応じて更新しなければならない。
-##              すなわち、holdありなら["holdShape"]は、["nextShapeList"]["element"+str(next_order)]になる。
-##              holdなしなら、["holdShape"]は、変わらない。
-##              したがって、正確に再帰するには下記のようにしなければならない。
-##              1. next_stepsの結果で、hold有無をQ値に従って決定する。
-##              2. 決定した結果により、GameStatusを更新する。呼び出し元のGameStatus[]を変更するのはまずいので、
-##                  この関数内専用のGameStatusを用意してコピーしなければならないと思う。ん？pythonなら大丈夫かな？
-##                  いろいろ大変なので、ここからの再帰については、holdは常になしにしておく
-##                  これにより、1手までは正しいが、2手以降については、正しく推論できないと思う。
-##                  例えば、１手目でhold実行した場合、2手目のholdShapeが正しくない。
-##                  正しくは、nextShapeList, element+str(next_order)がholdShapeなのに、そうならずに最初のholdShapeのままになる。
-##              あれ？何か違う。get_predictions()の中身を確認しないと・・・。ただ、一旦動作するかどうか見よう。
-
-                #GameStatus["block_info"]["nextShapeList"]["element"+str(1)]["direction_range"]
+                ###　上記のホールドなし（hold_n）でのテトリミノは下記になる
+                hold_n_piece_id = hold_piece_id
+                hold_n_shape_class = hold_shape_class
+                ### 上記のホールドあり(hold_y)でホールドされているテトリミノは、["element"+str(next_order)]になる。
+                ### したがって、下記のように、hold_yを設定する。
+                hold_y_piece_id = GameStatus["block_info"]["nextShapeList"]["element"+str(next_order)]["index"]
+                hold_y_shape_class = GameStatus["block_info"]["nextShapeList"]["element"+str(next_order)]["class"]
     
                 ## 次の予測を上位 num_steps 実施, next_order 番目から left 番目まで予測
                 new_index_list, index_list_to_q, new_next_actions, new_next_states \
                                 = self.get_predictions(predict_model, is_train, GameStatus, 
                                     next_steps, num_steps, next_order+1, left, new_index_list, 
-                                    index_list_to_q, highest_q)
+                                    index_list_to_q, highest_q, hold_y_piece_id, hold_y_shape_class, hold_n_piece_id, hold_n_shape_class)
                 # 次のカウント
                 #predict_order += 1
         # 再帰終了
