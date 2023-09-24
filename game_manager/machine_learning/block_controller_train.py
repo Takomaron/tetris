@@ -800,6 +800,8 @@ class Block_Controller(object):
         num_holes = 0
         # 穴の上の積み上げペナルティ
         hole_top_penalty = 0
+        ### 穴の深さ積算ペナルティ
+        hole_depth_sum_penalty = 0
         # 地面の高さ list
         highest_grounds = [-1] * self.width
         # 最も高い穴の list
