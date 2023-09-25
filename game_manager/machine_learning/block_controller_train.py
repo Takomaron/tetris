@@ -955,7 +955,9 @@ class Block_Controller(object):
         """
         # Retry25
         fill_up_reward = 1  #　rewardの加算を 定数1 の代わりに変数としている
+        """Try10:3行消し報酬以上にする計算はv2側で行っているので、ここでは消す。
         reward = self.reward_list[3] / self.tetris_fill_reward  #★　左空け報酬を３行消し報酬より上にする。行数の影響を受ける。
+        """
         # 高さがtetris fill height未満の間だけ報酬を加算する。
         for i in range(1, self.tetris_fill_height):
             # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬上げない。
@@ -968,13 +970,20 @@ class Block_Controller(object):
                         reward += self.reward_list[3]/self.reward_list[4]/self.tetris_fill_reward
                     """
                 else:   # 左空けが連続している間だけ報酬を与える
+                    """ Try10:左端だけが開いている状態のときの報酬加算を半分にしてみる。
                     fill_up_reward = 0  # 左端だけが開いている状態でなければ、これ以降報酬は増えない。
                                         # 0.5にしようかと思ったが・・・
+                    """
+                    fill_up_reward = 0.5  # Try10 左端だけが開いている状態でなければ、報酬半分。
                 """ 下記の調整は、パラメータ調整で不要になったと思われるので削除
             # 全幅埋まっていれば、削除される行だから、報酬加算を継続・・・これにより、削除しない場合と報酬の差がなくなる。
             elif sum_[self.height - i] == self.width:
                 reward += fill_up_reward
                 """
+            ###Try10:下記の報酬加算を復活。あまりよく調べる時間が無いので、0クリアされるのを防ぐため。
+            # 全幅埋まっていれば、削除される行だから、報酬加算を継続・・・これにより、削除しない場合と報酬の差がなくなる。
+            elif sum_[self.height - i] == self.width:
+                reward += fill_up_reward
             else:   # ここは、左端が埋まっていて、かつ、削除行でもない場合。左端を開けている意味がないので報酬０
                     # 報酬半減がいいかとも思ったが、とりあえず、Retry25では0
                 reward = 0
@@ -1407,6 +1416,7 @@ class Block_Controller(object):
             reward += self.all_clear
             self.cleared_col[5] += 1    ## 全クリア回数をここで加算しておく。
         #### 形状の罰報酬
+        """ Try10 穴数積算 Penaltyだけにする
         ## でこぼこ度罰
         reward -= self.reward_weight[0] * bampiness 
         ## 最大高さ罰
@@ -1418,8 +1428,20 @@ class Block_Controller(object):
         reward -= self.hole_top_limit_reward * hole_top_penalty * max_highest_hole
         ## 左端以外埋めている状態報酬
         ## やばい高さ以上で左空け報酬をなくすTry04
+        """
+        ### Try10:最大高さ罰については、そのままにしておく。
+        if max_height > self.max_height_relax:
+            reward -= self.reward_weight[1] * max(0,max_height)
+        ### Try10:穴数積算Penaltyの係数に穴の数罰係数を使う
+        reward -= self.reward_weight[2] * hole_depth_sum_penalty
+
+        if max_height < self.max_height_relax:
+            if tetris_reward:
+                reward += max(tetris_reward * self.tetris_fill_reward, self.reward_list[3] * (1 + (self.height)/self.height_line_reward))
+        """ Try10:3行消しより左空け報酬を上にする。↑
         if max_height < self.max_height_relax:
             reward += tetris_reward * self.tetris_fill_reward
+        """
         """左端が埋まっている場合に、左開け報酬を0にしているので、このペナルティは無しにしてみる。
         ## 左端が高すぎる場合の罰
         if left_side_height > self.bumpiness_left_side_relax:
