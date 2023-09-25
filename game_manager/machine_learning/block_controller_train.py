@@ -800,7 +800,7 @@ class Block_Controller(object):
         num_holes = 0
         # 穴の上の積み上げペナルティ
         hole_top_penalty = 0
-        ### 穴の深さ積算ペナルティ
+        ### Try10:穴の深さ積算ペナルティ
         hole_depth_sum_penalty = 0
         # 地面の高さ list
         highest_grounds = [-1] * self.width
@@ -824,6 +824,8 @@ class Block_Controller(object):
                 if state == 0:
                     #num_holes += 1
                     cols_holes.append(self.height - (ground_level + 1 + y) - 1)
+                    ###Try10: 穴の深さをペナルティとして積算する。
+                    hole_depth_sum_penalty += y
             ## 旧 1 liner 方式のカウント
             #cols_holes = [x for x in col[ground_level + 1:] if x == 0]
             # list をカウントして穴の数をカウント
@@ -854,7 +856,7 @@ class Block_Controller(object):
             if lowest_holes[i] != self.height and \
                lowest_holes[i] > self.hole_top_limit_height and \
                highest_grounds[i] >= lowest_holes[i] + self.hole_top_limit:
-                hole_top_penalty += highest_grounds[i] - lowest_holes[i]
+                hole_top_penalty += (highest_grounds[i] - lowest_holes[i])
             # これは、穴の上の積み上げ数ではなく、穴の上の積み上げ高さになる。穴が多くても、ペナルティは一緒。天井が消されれば、ペナルティが一気に減るからいい方向
 
         """
@@ -881,7 +883,7 @@ class Block_Controller(object):
             #print(hole_top_penalty, hole_top_penalty*max_highest_hole)
             #print("==")
         """
-        return num_holes, hole_top_penalty, max_highest_hole
+        return num_holes, hole_top_penalty, max_highest_hole, hole_depth_sum_penalty
     
     ####################################
     # 現状状態の各種パラメータ取得 (MLP
@@ -890,7 +892,7 @@ class Block_Controller(object):
         #削除された行の報酬
         lines_cleared, reshape_board = self.check_cleared_rows(reshape_board)
         # 穴の数
-        holes, _ , _ = self.get_holes(reshape_board, -1)
+        holes, _ , _ , _ = self.get_holes(reshape_board, -1)
         # でこぼこの数
         bumpiness, height, max_height, min_height, _, _ = self.get_bumpiness_and_height(reshape_board)
 
@@ -903,7 +905,7 @@ class Block_Controller(object):
         # 削除された行の報酬
         lines_cleared, reshape_board = self.check_cleared_rows(reshape_board)
         # 穴の数
-        holes, _ , _ = self.get_holes(reshape_board, -1)
+        holes, _ , _ , _ = self.get_holes(reshape_board, -1)
         # でこぼこの数
         bumpiness, height, max_row, min_height, _, _ = self.get_bumpiness_and_height(reshape_board)
         # 最大高さ
@@ -1391,7 +1393,7 @@ class Block_Controller(object):
         bampiness, total_height, max_height, min_height, left_side_height, over3_diff_count = self.get_bumpiness_and_height(reshape_board)
         #max_height = self.get_max_height(reshape_board)
         ## 穴の数, 穴の上積み上げ Penalty, 最も高い穴の位置を求める
-        hole_num, hole_top_penalty, max_highest_hole = self.get_holes(reshape_board, min_height)
+        hole_num, hole_top_penalty, max_highest_hole, hole_depth_sum_penalty = self.get_holes(reshape_board, min_height)
         ## 左端あけた形状の報酬計算
         tetris_reward = self.get_tetris_fill_reward(reshape_board)
         ## 消せるセルの確認
@@ -1451,7 +1453,7 @@ class Block_Controller(object):
         # 報酬計算元の値取得
         bampiness, height, max_height, min_height, _, _ = self.get_bumpiness_and_height(reshape_board)
         #max_height = self.get_max_height(reshape_board)
-        hole_num, _ , _ = self.get_holes(reshape_board, min_height)
+        hole_num, _ , _ , _ = self.get_holes(reshape_board, min_height)
         lines_cleared, reshape_board = self.check_cleared_rows(reshape_board)
         #### 報酬の計算
         reward = self.reward_list[lines_cleared] 
@@ -1856,7 +1858,7 @@ class Block_Controller(object):
                 #ボードを２次元化
                 reshape_board = self.get_reshape_backboard(curr_backboard)
                 ## 最も高い穴の位置を求める
-                _ , _ , max_highest_hole = self.get_holes(reshape_board, -1)
+                _ , _ , max_highest_hole , hole_depth_sum_penalty = self.get_holes(reshape_board, -1)
                 ## model2 切り替え条件
                 if max_highest_hole < self.predict_weight2_enable_index:    ##ヒステリシスを設けている？
                     self.weight2_enable = True
