@@ -1392,6 +1392,7 @@ class Block_Controller(object):
     #reward_func から呼び出される
     ####################################
     def step_v2(self, curr_backboard, action, curr_shape_class):
+        penalty = 0
         x0, direction0, third_y, forth_direction, fifth_x, use_hold_function = action
         ## 画面ボードデータをコピーして指定座標にテトリミノを配置し落下させた画面ボードとy座標を返す
         board, drop_y = self.getBoard(curr_backboard, curr_shape_class, direction0, x0, -1)
@@ -1408,12 +1409,14 @@ class Block_Controller(object):
         ## 消せるセルの確認
         lines_cleared, reshape_board = self.check_cleared_rows(reshape_board)
         ## 報酬の計算
-        reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0,max_height))/self.height_line_reward)
+        ###DT01 ひくいところの影響をなくし、Reward合計を、±1の範囲にする。
+        ###reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0,max_height))/self.height_line_reward)
+        reward = self.reward_list[lines_cleared] * (1 - self.tetris_fill_reward)
         ## 継続報酬
         #reward += 0.01
         #★　全クリア報酬
         if max_height == 0:
-            reward += self.all_clear
+            reward += self.all_clear    ## All celarはクリッピングしていない。
             self.cleared_col[5] += 1    ## 全クリア回数をここで加算しておく。
         #### 形状の罰報酬
         """ Try10 穴数積算 Penaltyだけにする
@@ -1429,15 +1432,25 @@ class Block_Controller(object):
         ## 左端以外埋めている状態報酬
         ## やばい高さ以上で左空け報酬をなくすTry04
         """
+        ### DT10:高さ罰は、高さの2乗を正規化して、weightをかける
+        penalty = max_height * max_height / (22*22) * self.reward_weight[1]
+        """DT10
         ### Try10:最大高さ罰については、そのままにしておく。
         if max_height > self.max_height_relax:
             reward -= self.reward_weight[1] * max(0,max_height)
+        """
         ### Try10:穴数積算Penaltyの係数に穴の数罰係数を使う
-        reward -= self.reward_weight[2] * hole_depth_sum_penalty
+        ##reward -= self.reward_weight[2] * hole_depth_sum_penalty
+        penalty += self.reward_weight[2] * hole_depth_sum_penalty / 2100 #2100=10*(8+22)*14/2
 
+        ### DT01:行数補正をなくしたので、単純にtetris報酬を加える。reward合計を+1の範囲に抑える
+        if max_height < self.max_height_relax:
+            reward += (tetris_reward / self.max_height_relax * self.tetris_fill_reward)
+        """
         if max_height < self.max_height_relax:
             if tetris_reward:
                 reward += max(tetris_reward * self.tetris_fill_reward, self.reward_list[3] * (1 + (self.height)/self.height_line_reward))
+        """
         """ Try10:3行消しより左空け報酬を上にする。↑
         if max_height < self.max_height_relax:
             reward += tetris_reward * self.tetris_fill_reward
@@ -1448,8 +1461,12 @@ class Block_Controller(object):
             reward -= (left_side_height - self.bumpiness_left_side_relax) * self.left_side_height_penalty
         """
         # 3以上の段差を作った場合の罰
-        reward -= over3_diff_count * self.over3_diff_penalty
+        ### Max9個と想定
+###        reward -= over3_diff_count * self.over3_diff_penalty
+        penalty += over3_diff_count / 9 * self.over3_diff_penalty
         #print(over3_diff_count * self.over3_diff_penalty)
+        ### DT01 reward clippingでペナルティは0..-1になっている。ゲームオーバー以外は負にならないので、Penaltyをそのまま係数をかけずに使う
+        reward -= penalty
 
         self.epoch_reward += reward 
 
