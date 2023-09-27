@@ -777,7 +777,9 @@ class Block_Controller(object):
         # 差分の絶対値をとり配列にする
         diffs = np.abs(currs - nexts)
         # 左端列は self.bumpiness_left_side_relax 段差まで許容
-        if heights[1] - heights[0] > self.bumpiness_left_side_relax or heights[1] - heights[0] < 0 :
+        ### Try13 左積みをペナルティにするため、bumpiness_left_side_relaxを0にするから下記の条件を変更
+###        if heights[1] - heights[0] > self.bumpiness_left_side_relax or heights[1] - heights[0] < 0 :
+        if heights[1] - heights[0] < 0 :
             diffs = np.append(abs(heights[1] - heights[0]), diffs)
 
         # 差分の絶対値を合計してでこぼこ度とする
@@ -986,8 +988,11 @@ class Block_Controller(object):
                 reward += fill_up_reward
             else:   # ここは、左端が埋まっていて、かつ、削除行でもない場合。左端を開けている意味がないので報酬０
                     # 報酬半減がいいかとも思ったが、とりあえず、Retry25では0
+                """Try13 左端埋めについてはペナルティとしてstep_v2()で引き算することに変更
                 reward = 0
                 break   # 一番下から左端だけが空いている高さを報酬とするが、上が埋まっていたら、報酬０
+                """
+                continue
 
         return reward
 
@@ -1454,6 +1459,9 @@ class Block_Controller(object):
         if left_side_height > self.bumpiness_left_side_relax:
             reward -= (left_side_height - self.bumpiness_left_side_relax) * self.left_side_height_penalty
         """
+        ### Try13 左端埋めペナルティを追加する。一つでも積んでいたらペナルティ。
+        reward -= left_side_height * self.left_side_height_penalty
+
         # 3以上の段差を作った場合の罰
         reward -= over3_diff_count * self.over3_diff_penalty
         #print(over3_diff_count * self.over3_diff_penalty)
