@@ -58,7 +58,7 @@ train:
   height_line_reward: 9 #低いところの消去ほど有効とする設定(10000 くらいでほぼ無効 大きい値ほど報酬小さい)
   reward_weight: # 形状報酬の配分
     - 0.00005 #1 #bampiness 
-    - 0.001 #1 #max height
+    - 0.0001 #1 #max height
     - 0.001 #1 #hole_num
   bumpiness_left_side_relax: 14 # 左端のでこぼこだけどこまで許容するか
   max_height_relax: 14 # 高さをどこまで許容するか(左記より大きい)
@@ -80,7 +80,7 @@ train:
   predict_next_num: 3 # 次のテトリミノ予測数 (0: 無効) #DQN限定
   predict_next_steps: 5 #  1つの手番で候補手をいくつ探すか #DQN限定
   predict_next_num_train: 3 # 次のテトリミノ予測有効化 (学習時) (0: 無効) #DQN限定
-  predict_next_steps_train: 5 #  1つの手番で候補手をいくつ探すか (学習時) #DQN限定
+  predict_next_steps_train: 3 #  1つの手番で候補手をいくつ探すか (学習時) #DQN限定
 tetris:
   board_height: 22 # 画面ボード高さ 22 固定
   board_width: 10 # 画面ボード幅 10 固定
