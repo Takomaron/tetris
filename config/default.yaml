@@ -80,7 +80,7 @@ train:
   predict_next_num: 3 # 次のテトリミノ予測数 (0: 無効) #DQN限定
   predict_next_steps: 5 #  1つの手番で候補手をいくつ探すか #DQN限定
   predict_next_num_train: 3 # 次のテトリミノ予測有効化 (学習時) (0: 無効) #DQN限定
-  predict_next_steps_train: 3 #  1つの手番で候補手をいくつ探すか (学習時) #DQN限定
+  predict_next_steps_train: 2 #  1つの手番で候補手をいくつ探すか (学習時) #DQN限定
 tetris:
   board_height: 22 # 画面ボード高さ 22 固定
   board_width: 10 # 画面ボード幅 10 固定
