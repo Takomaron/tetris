@@ -1,4 +1,4 @@
-#Try18
+#Try19
 common:
   #### 学習用Weight
   ## File 指定
@@ -86,9 +86,9 @@ tetris:
   board_width: 10 # 画面ボード幅 10 固定
   score_list: # 学習用スコア
     - 0
-    - 30
-    - 50
     - 100
-    - 1000
-    - -1000
+    - 300
+    - 900
+    - 2700
+    - -2700
   max_tetrominoes: 150 # 1 EPOCH のテトリミノ学習数
