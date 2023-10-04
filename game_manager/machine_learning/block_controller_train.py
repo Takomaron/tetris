@@ -1415,7 +1415,13 @@ class Block_Controller(object):
         ## 報酬の計算
         ### Try11 行消し報酬は、純粋に行けしだけにして、高い位置で消しても低い位置で消しても同じにする
 ###        reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0,max_height))/self.height_line_reward)
+        """ Try22 やばい高さ未満で３行以下のクリアの場合は報酬なし
         reward = self.reward_list[lines_cleared]
+        """
+        if max_height < self.max_height_relax and lines_cleared < 4: # やばい高さ以下で４行未満の削除は報酬なし
+            reward = 0
+        else:
+            reward = self.reward_list[lines_cleared]
         ## 継続報酬
         #reward += 0.01
         #★　全クリア報酬
