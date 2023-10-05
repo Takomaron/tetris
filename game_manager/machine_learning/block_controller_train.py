@@ -1397,6 +1397,10 @@ class Block_Controller(object):
     #reward_func から呼び出される
     ####################################
     def step_v2(self, curr_backboard, action, curr_shape_class):
+        ### Try23 穴数の継続罰を追加する。
+        last_hole_num = 0
+        hole_keep_count = 1
+
         x0, direction0, third_y, forth_direction, fifth_x, use_hold_function = action
         ## 画面ボードデータをコピーして指定座標にテトリミノを配置し落下させた画面ボードとy座標を返す
         board, drop_y = self.getBoard(curr_backboard, curr_shape_class, direction0, x0, -1)
@@ -1419,7 +1423,13 @@ class Block_Controller(object):
         reward = self.reward_list[lines_cleared]
         """
         if max_height < self.max_height_relax and lines_cleared < 4: # やばい高さ以下で４行未満の削除は報酬なし
+            """
             reward = 0
+            """ ### Try23 穴が減らないのに、消した場合は、４行消しできた場合との差分をペナルティにする
+            if hole_num < last_hole_num:    ### 穴が減った
+                reward = 0
+            else:
+                reward = self.reward_list[lines_cleared] - self.reward_list[4]
         else:
             reward = self.reward_list[lines_cleared]
         ## 継続報酬
@@ -1442,7 +1452,16 @@ class Block_Controller(object):
         reward -= self.reward_weight[1] * max(0,max_height * max_height)
         """
         ## 穴の数罰
+        """
         reward -= self.reward_weight[2] * hole_num
+        """ ### Try23 穴継続罰追加
+        if hole_num and (hole_num >= last_hole_num):    ### 穴が減ってない
+            hole_keep_count += 1
+        else:
+            hole_keep_count = 1
+        reward -= self.reward_weight[2] * hole_num * hole_keep_count
+        last_hole_num = hole_num
+
         ## 穴の上のブロック数罰
         reward -= self.hole_top_limit_reward * hole_top_penalty * max_highest_hole
         ## 左端以外埋めている状態報酬
