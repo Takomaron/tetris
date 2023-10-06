@@ -1419,19 +1419,29 @@ class Block_Controller(object):
         ## 報酬の計算
         ### Try11 行消し報酬は、純粋に行けしだけにして、高い位置で消しても低い位置で消しても同じにする
 ###        reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0,max_height))/self.height_line_reward)
-        """ Try22 やばい高さ未満で３行以下のクリアの場合は報酬なし
+        
         reward = self.reward_list[lines_cleared]
-        """
-        if max_height < self.max_height_relax and lines_cleared < 4: # やばい高さ以下で４行未満の削除は報酬なし
-            """
-            reward = 0
-            """ ### Try23 穴が減らないのに、消した場合は、４行消しできた場合との差分をペナルティにする
+        
+        """ Try24 Try23ではMax高さを上げてから消しにかかるような動きになったので、ペナルティをやめる
+        if max_height < self.max_height_relax/2 and lines_cleared < 4: # やばい高さ以下で４行未満の削除は報酬なし
+            ### Try23 穴が減らないのに、消した場合は、４行消しできた場合との差分をペナルティにする
             if hole_num < last_hole_num:    ### 穴が減った
                 reward = 0
             else:
                 reward = self.reward_list[lines_cleared] - self.reward_list[4]
         else:
             reward = self.reward_list[lines_cleared]
+        """
+        ### Try24で下記に変更しようとしたが。やめておく。
+        """
+        if lines_cleared == 4 or max_height >= self.max_height_relax:
+            reward = self.reward_list[lines_cleared]
+        elif hole_num < last_hole_num:    ### 穴が減った
+            reward = self.reward_list[lines_cleared]
+        else:
+            reward = self.reward_list[lines_cleared] / 10
+        """
+        
         ## 継続報酬
         #reward += 0.01
         #★　全クリア報酬
@@ -1444,24 +1454,21 @@ class Block_Controller(object):
         ## でこぼこ度罰
         reward -= self.reward_weight[0] * bampiness 
         ## 最大高さ罰
-        """ Try11 高さバツを高さの２乗にする
-        """
         if max_height > self.max_height_relax:
             reward -= self.reward_weight[1] * max(0,max_height)
-        """ Try21 高さバツをもとに戻す
+        """ Try11 高さバツを高さの２乗にする Try21 高さバツをもとに戻す
         reward -= self.reward_weight[1] * max(0,max_height * max_height)
         """
-        ## 穴の数罰
-        """
+        ## 穴の数罰 Try24で、Try23を戻しておく。
         reward -= self.reward_weight[2] * hole_num
-        """ ### Try23 穴継続罰追加
+        """ ### Try23 穴継続罰追加 Try24で無効化
         if hole_num and (hole_num >= last_hole_num):    ### 穴が減ってない
             hole_keep_count += 1
         else:
             hole_keep_count = 1
         reward -= self.reward_weight[2] * hole_num * hole_keep_count
         last_hole_num = hole_num
-
+        """
         ## 穴の上のブロック数罰
         reward -= self.hole_top_limit_reward * hole_top_penalty * max_highest_hole
         ## 左端以外埋めている状態報酬
@@ -1485,15 +1492,17 @@ class Block_Controller(object):
         ## ４行未満は、やばい高さ以上になるまではやってほしくない。・・・やばい高さ以下での３行以下の削除は報酬なし
         ## 
 
+        """Try24 tetris_rewardを単純化
         if max_height < self.max_height_relax:
             if tetris_reward:
                 ### Try11:行削除の影響を抑えるため、高さで割る。高さ報酬も消しておく
 ###                reward += max(tetris_reward * self.tetris_fill_reward, self.reward_list[3] * (1 + (self.height)/self.height_line_reward))
+        ### Try10:3行消しより左空け報酬を上にする。↓
                 reward += max(tetris_reward * self.tetris_fill_reward / max_height, self.reward_list[3])
-        """ Try10:3行消しより左空け報酬を上にする。↑
+        """
         if max_height < self.max_height_relax:
             reward += tetris_reward * self.tetris_fill_reward
-        """
+        
         """左端が埋まっている場合に、左開け報酬を0にしているので、このペナルティは無しにしてみる。
         ## 左端が高すぎる場合の罰
         if left_side_height > self.bumpiness_left_side_relax:
