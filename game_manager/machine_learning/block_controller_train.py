@@ -1419,31 +1419,19 @@ class Block_Controller(object):
         ## 報酬の計算
         ### Try11 行消し報酬は、純粋に行けしだけにして、高い位置で消しても低い位置で消しても同じにする
 ###        reward = self.reward_list[lines_cleared] * (1 + (self.height - max(0,max_height))/self.height_line_reward)
-        
+        """
         reward = self.reward_list[lines_cleared]
-        
-        """ Try24 Try23ではMax高さを上げてから消しにかかるような動きになったので、ペナルティをやめる
-        if max_height < self.max_height_relax/2 and lines_cleared < 4: # やばい高さ以下で４行未満の削除は報酬なし
-            ### Try23 穴が減らないのに、消した場合は、４行消しできた場合との差分をペナルティにする
-            if hole_num < last_hole_num:    ### 穴が減った
-                reward = 0
-            else:
-                reward = self.reward_list[lines_cleared] - self.reward_list[4]
-        else:
-            reward = self.reward_list[lines_cleared]
         """
         ### Try24で下記に変更しようとしたが。やめておく。
-        """
+        ### Try24.1で復活
+        
         if lines_cleared == 4 or max_height >= self.max_height_relax:
             reward = self.reward_list[lines_cleared]
         elif hole_num < last_hole_num:    ### 穴が減った
             reward = self.reward_list[lines_cleared]
         else:
             reward = self.reward_list[lines_cleared] / 10
-        """
         
-        ## 継続報酬
-        #reward += 0.01
         #★　全クリア報酬
         if max_height == 0:
             reward += self.all_clear
