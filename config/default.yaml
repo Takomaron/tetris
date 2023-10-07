@@ -1,4 +1,4 @@
-#Try24.3
+#Try24.4
 common:
   #### 学習用Weight
   ## File 指定
@@ -64,9 +64,9 @@ train:
   max_height_relax: 14 # 高さをどこまで許容するか(左記より大きい)
 
 ### Try11は0.012。Try12は0.05
-  tetris_fill_reward: 0.001 # 左端以外を埋める報酬率 #DQN限定 #DQN限定
+  tetris_fill_reward: 0.000 # 左端以外を埋める報酬率 #DQN限定 #DQN限定
   tetris_fill_height: 14 # 左端以外を埋める報酬有効化上限高さ #DQN限定
-  left_side_height_penalty: 0.001 # 左端を tetris_fill_height 以上積んだ時の penalty #DQN限定
+  left_side_height_penalty: 0.000 # 左端を tetris_fill_height 以上積んだ時の penalty #DQN限定
 
   hole_top_limit_reward: 0.0001  # 穴の上の積み上げペナルティ #DQN限定
   hole_top_limit_height: -1 # 穴の上の積み上げペナルティ下限絶対高さ、この高さより上のときのみペナルティ有効 (22: 無効, -1:制限なし)
