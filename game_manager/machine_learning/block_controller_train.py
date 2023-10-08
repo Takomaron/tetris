@@ -946,7 +946,7 @@ class Block_Controller(object):
         #print(sum_)
         
         """ Retry25(下から連続している行数だけカウント)移植
-        # line (1 - self.tetris_fill_height)段目の左端以外そろっているか
+        # line (1 - self.tetris_fill_height)段目の左端以外そろっているか・・・左端以外が埋まっている行数★
         for i in range(1, self.tetris_fill_height):
             # そろっている段ごとに報酬
             if self.get_line_right_fill(reshape_board, sum_, i):
@@ -984,6 +984,7 @@ class Block_Controller(object):
                 """
             ###Try10:下記の報酬加算を復活。あまりよく調べる時間が無いので、0クリアされるのを防ぐため。
             # 全幅埋まっていれば、削除される行だから、報酬加算を継続・・・これにより、削除しない場合と報酬の差がなくなる。
+            ## Try25でも、この消される行のカウントを残さないと削除直前の左空け行数が計算されなくなるので必要。
             elif sum_[self.height - i] == self.width:
                 reward += fill_up_reward
             else:   # ここは、左端が埋まっていて、かつ、削除行でもない場合。左端を開けている意味がないので報酬０
@@ -1502,6 +1503,9 @@ class Block_Controller(object):
         # 3以上の段差を作った場合の罰
         reward -= over3_diff_count * self.over3_diff_penalty
         #print(over3_diff_count * self.over3_diff_penalty)
+
+        ### Try25 ４行消しの積算報酬を追加する
+        reward += self.tetris_fill_reward * self.cleared_col[4] * 5
 
         self.epoch_reward += reward 
 
