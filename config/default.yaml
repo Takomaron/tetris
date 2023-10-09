@@ -2,7 +2,7 @@
 common:
   #### 学習用Weight
   ## File 指定
-  ft_weight: weight/DQN/best_weight.pt
+  ft_weight: outputs/2023-10-09-18-37-21/trained_model/best_weight.pt
   log_path: tensorboard
   time_disp: False
   #### 推論用Weight
