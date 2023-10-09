@@ -1,4 +1,4 @@
-#Try26.2
+#Try26.2_FT
 common:
   #### 学習用Weight
   ## File 指定
@@ -20,8 +20,8 @@ common:
   predict_weight2_disable_index: 10
 model:
   name: DQN # 学習方式 (MLP DQN)
-  finetune: False #★ 以前の学習結果を利用する (True False)
-#  finetune: True #★ FineTune時用
+#  finetune: False #★ 以前の学習結果を利用する (True False)
+  finetune: True #★ FineTune時用
 state:
   dim: 4
 train:
@@ -32,8 +32,8 @@ train:
   lr_step_size: 1000 # SGD 用 ... step size 学習率更新タイミングの EPOCH 数  (1 to num_epoch)
   num_epoch: 10000 # 試行回数 (lr_step_size to num_epoch)
   num_decay_epochs: 3500 # ε収束させる試行回数
-  initial_epsilon: 1.0 # ε... 学習が局所解にならないように乱数で動かして最適値する。学習初期は 1, 初期値 Fine Tune の場合は小さめに  (0 to 1.0)
-#  initial_epsilon: 0.2 #★ FineTune用
+#  initial_epsilon: 1.0 # ε... 学習が局所解にならないように乱数で動かして最適値する。学習初期は 1, 初期値 Fine Tune の場合は小さめに  (0 to 1.0)
+  initial_epsilon: 0.2 #★ FineTune用
   final_epsilon: 1.0e-3 # 上記εを漸減させたときの最終値 num_decay_epochs 試行後  (0 to final_epsilon)
   batch_size: 512 # バッチサイズ　確率的勾配降下法における、全パラメータのうちランダム抽出して勾配を求めるパラメータの数 (2^n)
   gamma: 0.8 # 割引率 ... t+1 の報酬をどの程度割り引いて考えるか (0 to 1.0)
