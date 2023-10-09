@@ -1423,10 +1423,18 @@ class Block_Controller(object):
         """
         reward = self.reward_list[lines_cleared]
         """
+        """
         ### Try24で下記に変更しようとしたが。やめておく。
         ### Try24.1で復活
-        
         if lines_cleared == 4 or max_height >= self.max_height_relax:
+            reward = self.reward_list[lines_cleared]
+        elif hole_num < last_hole_num:    ### 穴が減った
+            reward = self.reward_list[lines_cleared]
+        else:
+            reward = self.reward_list[lines_cleared] / 10
+        """
+        ### Try26 高さによる判断をやめる
+        if lines_cleared == 4:
             reward = self.reward_list[lines_cleared]
         elif hole_num < last_hole_num:    ### 穴が減った
             reward = self.reward_list[lines_cleared]
@@ -1443,8 +1451,13 @@ class Block_Controller(object):
         ## でこぼこ度罰
         reward -= self.reward_weight[0] * bampiness 
         ## 最大高さ罰
+        """
         if max_height > self.max_height_relax:
             reward -= self.reward_weight[1] * max(0,max_height)
+        """
+        ### Try26 変則的な高さバツをやめ、所定高さを超えている分をペナルティにする
+        reward -= self.reward_weight[1] * max(0, max_height - self.max_height_relax)
+
         """ Try11 高さバツを高さの２乗にする Try21 高さバツをもとに戻す
         reward -= self.reward_weight[1] * max(0,max_height * max_height)
         """
@@ -1489,8 +1502,12 @@ class Block_Controller(object):
         ### Try10:3行消しより左空け報酬を上にする。↓
                 reward += max(tetris_reward * self.tetris_fill_reward / max_height, self.reward_list[3])
         """
+        """
         if max_height < self.max_height_relax:
             reward += tetris_reward * self.tetris_fill_reward
+        """
+        ### Try26 左空け報酬は高さに関係なく与える
+        reward += tetris_reward * self.tetris_fill_reward
         
         """左端が埋まっている場合に、左開け報酬を0にしているので、このペナルティは無しにしてみる。
         ## 左端が高すぎる場合の罰
