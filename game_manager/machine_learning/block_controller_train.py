@@ -1433,6 +1433,7 @@ class Block_Controller(object):
         else:
             reward = self.reward_list[lines_cleared] / 10
         """
+        reward = 0
         """ Try26.8 行消し報酬をゼロにしてみる
         ### Try26 高さによる判断をやめる
         if lines_cleared == 4:
