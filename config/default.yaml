@@ -1,4 +1,4 @@
-#Try27.7
+#Try27.8
 common:
   #### 学習用Weight
   ## File 指定
@@ -67,7 +67,7 @@ train:
   tetris_fill_height: 14 # 左端以外を埋める報酬有効化上限高さ #DQN限定
   left_side_height_penalty: 0.000 # 左端を tetris_fill_height 以上積んだ時の penalty #DQN限定
 
-  hole_top_limit_reward: 0.001  # 穴の上の積み上げペナルティ #DQN限定
+  hole_top_limit_reward: 0.01  # 穴の上の積み上げペナルティ #DQN限定
   hole_top_limit_height: -1 # 穴の上の積み上げペナルティ下限絶対高さ、この高さより上のときのみペナルティ有効 (22: 無効, -1:制限なし)
   hole_top_limit: 1 # 穴の上の積み上げペナルティ 穴の位置が左記の相対高さより高いときのみ
 
