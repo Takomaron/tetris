@@ -1545,6 +1545,10 @@ class Block_Controller(object):
         ### Try25 ４行消しの積算報酬を追加する
         reward += self.tetris_fill_reward * self.cleared_col[4] * 5
 
+        ### Try28 行けし積算報酬を追加する
+        for i in range(1,5):
+            reward += self.reward_list[i] * self.cleared_col[i] * self.reward_weight[3]
+
         self.epoch_reward += reward 
 
         # スコア計算
