@@ -1433,7 +1433,6 @@ class Block_Controller(object):
         else:
             reward = self.reward_list[lines_cleared] / 10
         """
-        """
         reward = 0
         """
         ### Try27.3 穴消し時だけ報酬を与える
@@ -1441,6 +1440,7 @@ class Block_Controller(object):
             reward = self.reward_list[lines_cleared]
         else:
             reward = 0
+        """
         """
         ### Try27 ４行消しだけ報酬を与える
         if lines_cleared == 4:
@@ -1489,9 +1489,11 @@ class Block_Controller(object):
         """
         last_hole_num = hole_num
         ## 穴の上のブロック数罰
+        """
         reward -= self.hole_top_limit_reward * hole_top_penalty * max_highest_hole
-        ### 下記にすべきなはず。
-###        reward -= self.hole_top_limit_reward * hole_top_penalty * max_highest_hole
+        """
+        ### Try27.6 上の式がおかしいように感じたので修正。
+        reward -= self.hole_top_limit_reward * hole_top_penalty
         ## 左端以外埋めている状態報酬
         ## やばい高さ以上で左空け報酬をなくすTry04
         """
