@@ -1529,8 +1529,15 @@ class Block_Controller(object):
         if max_height < self.max_height_relax:
             reward += tetris_reward * self.tetris_fill_reward
         """
+        ### Try30 現在のミノがIミノで、４行消し可能で、４行消しされていなければ、ペナルティにする。
+        if curr_shape_class.shape == 1 and tetris_reward >= 4 and lines_cleared != 4:
+            reward -= tetris_reward * self.tetris_fill_reward
+        else:
+            reward += tetris_reward * self.tetris_fill_reward
+        """
         ### Try26 左空け報酬は高さに関係なく与える
         reward += tetris_reward * self.tetris_fill_reward
+        """
         
         """左端が埋まっている場合に、左開け報酬を0にしているので、このペナルティは無しにしてみる。
         ## 左端が高すぎる場合の罰
@@ -1630,7 +1637,7 @@ class Block_Controller(object):
         self.board_data_height = GameStatus["field_info"]["height"]
 
         curr_shape_class = GameStatus["block_info"]["currentShape"]["class"]
-        next_shape_class= GameStatus["block_info"]["nextShape"]["class"]
+        next_shape_class = GameStatus["block_info"]["nextShape"]["class"]
         hold_shape_class = GameStatus["block_info"]["holdShape"]["class"]
         
         ##################
