@@ -1398,8 +1398,9 @@ class Block_Controller(object):
     ####################################
     #報酬を計算(2次元用) 
     #reward_func から呼び出される
+    # Try31 hold_shape_classを追加
     ####################################
-    def step_v2(self, curr_backboard, action, curr_shape_class):
+    def step_v2(self, curr_backboard, action, curr_shape_class, hold_shape_class):
         ### Try23 穴数の継続罰を追加する。
         last_hole_num = 0
         hole_keep_count = 1
@@ -1529,8 +1530,16 @@ class Block_Controller(object):
         if max_height < self.max_height_relax:
             reward += tetris_reward * self.tetris_fill_reward
         """
+        """
         ### Try30 現在のミノがIミノで、４行消し可能で、４行消しされていなければ、ペナルティにする。
         if curr_shape_class.shape == 1 and tetris_reward >= 4 and lines_cleared != 4:
+            reward -= tetris_reward * self.tetris_fill_reward
+        else:
+            reward += tetris_reward * self.tetris_fill_reward
+        """
+        # print("curr_shape_class.shape=",curr_shape_class.shape)
+        ## Try31 現在のミノか、ホールドミノがIミノで、４行消し可能で、４行消しされていなければ、ペナルティにする。とりあえず。なんか、もう少し場合分けしないと正しく学習しないかも
+        if (curr_shape_class.shape == 1 or hold_shape_class.shape == 1) and tetris_reward >= 4 and lines_cleared != 4:
             reward -= tetris_reward * self.tetris_fill_reward
         else:
             reward += tetris_reward * self.tetris_fill_reward
@@ -1799,7 +1808,7 @@ class Block_Controller(object):
                 curr_piece_id, hold_piece_id = hold_piece_id, curr_piece_id
                 ## Double DQN用に、holdありの場合は、入れ替えを行い、ここ以降の処理が整合するようにする。
             
-            reward = self.reward_func(curr_backboard, action, curr_shape_class)
+            reward = self.reward_func(curr_backboard, action, curr_shape_class, hold_shape_class)
             
             done = False #game over flag
             
