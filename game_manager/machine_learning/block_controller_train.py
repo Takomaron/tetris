@@ -1538,11 +1538,17 @@ class Block_Controller(object):
             reward += tetris_reward * self.tetris_fill_reward
         """
         # print("curr_shape_class.shape=",curr_shape_class.shape)
+        """
         ## Try31 現在のミノか、ホールドミノがIミノで、４行消し可能で、４行消しされていなければ、ペナルティにする。とりあえず。なんか、もう少し場合分けしないと正しく学習しないかも
         if (curr_shape_class.shape == 1 or hold_shape_class.shape == 1) and tetris_reward >= 4 and lines_cleared != 4:
             reward -= tetris_reward * self.tetris_fill_reward
         else:
             reward += tetris_reward * self.tetris_fill_reward
+        """
+        ### Try31.1 Penaltyを4行消し報酬にする。さらに、通常のリワード計算後に引き算するようにして、不連続を避ける
+        reward += tetris_reward * self.tetris_fill_reward
+        if (curr_shape_class.shape == 1 or hold_shape_class.shape == 1) and tetris_reward >= 4 and lines_cleared != 4:
+            reward -= self.reward_list[4]
         """
         ### Try26 左空け報酬は高さに関係なく与える
         reward += tetris_reward * self.tetris_fill_reward
@@ -1560,10 +1566,10 @@ class Block_Controller(object):
         reward -= over3_diff_count * self.over3_diff_penalty
         #print(over3_diff_count * self.over3_diff_penalty)
 
-        ### Try25 ４行消しの積算報酬を追加する
+        ### Try25 ４行消しの積算報酬を追加する・・・これで４行消しによる左空け報酬の減る分を補う。
         reward += self.tetris_fill_reward * self.cleared_col[4] * 5
 
-        ### Try28 行けし積算報酬を追加する
+        ### Try28 行けし積算報酬を追加する・・・Try29以降、ゼロにしている。
         for i in range(1,5):
             reward += self.reward_list[i] * self.cleared_col[i] * self.reward_weight[3]
 
