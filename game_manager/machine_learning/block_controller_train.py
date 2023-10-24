@@ -1567,7 +1567,8 @@ class Block_Controller(object):
         #print(over3_diff_count * self.over3_diff_penalty)
 
         ### Try25 ４行消しの積算報酬を追加する・・・これで４行消しによる左空け報酬の減る分を補う。
-        reward += self.tetris_fill_reward * self.cleared_col[4] * 5
+        ### Try31.2 ４行けし積算報酬を５倍から４倍に減らす
+        reward += self.tetris_fill_reward * self.cleared_col[4] * 4
 
         ### Try28 行けし積算報酬を追加する・・・Try29以降、ゼロにしている。
         for i in range(1,5):
