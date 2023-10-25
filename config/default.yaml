@@ -1,4 +1,4 @@
-#Try31.5
+#Try31.6
 common:
   #### 学習用Weight
   ## File 指定
@@ -61,7 +61,7 @@ train:
     - 0.01 #1 #max height
     - 0.01 #2 #hole_num
     - 0.00 #3 行消し報酬の積算係数
-    - 4.00 #4 4行消し報酬の積算係数
+    - 0.00 #4 4行消し報酬の積算係数
   bumpiness_left_side_relax: 14 # 左端のでこぼこだけどこまで許容するか
   max_height_relax: 14 # 高さをどこまで許容するか(左記より大きい)
 
