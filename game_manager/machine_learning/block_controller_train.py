@@ -1575,7 +1575,7 @@ class Block_Controller(object):
         reward += self.tetris_fill_reward * self.cleared_col[4] * 4
         """
         ### Try31.4 ４行けし積算報酬をパラメータ化
-        reward += self.tetris_fill_reward * self.cleared_col[4] * self.reward_weight[5]
+        reward += self.tetris_fill_reward * self.cleared_col[4] * self.reward_weight[4]
 
         ### Try28 行けし積算報酬を追加する・・・Try29以降、ゼロにしている。
         for i in range(1,5):
