@@ -1548,7 +1548,11 @@ class Block_Controller(object):
         ### Try31.1 Penaltyを4行消し報酬にする。さらに、通常のリワード計算後に引き算するようにして、不連続を避ける
         reward += tetris_reward * self.tetris_fill_reward
         if (curr_shape_class.shape == 1 or hold_shape_class.shape == 1) and tetris_reward >= 4 and lines_cleared != 4:
+            ### Try31.7 4行消ししないペナルティをパラメータ化
+            reward -= tetris_reward * self.reward_weight[5]
+            """
             reward -= tetris_reward * self.tetris_fill_reward
+            """
             """ ↑ Try31.4 左空け報酬を無しにするパターン
             reward -= self.reward_list[4]
             """
